@@ -1,22 +1,24 @@
 ---
+import { Handshake, MessageCircle, Store } from 'lucide-react';
+
 const points = [
-	{ icon: '💬', title: 'Order on WhatsApp', text: 'Chat with the seller, no account needed' },
-	{ icon: '🏪', title: 'Local sellers', text: 'Shops from across Bangladesh' },
-	{ icon: '🤝', title: 'Pay the seller', text: 'Agree on price and delivery directly' },
+	{ icon: MessageCircle, title: 'Order on WhatsApp', text: 'Chat with the seller, no account needed' },
+	{ icon: Store, title: 'Local sellers', text: 'Shops from across Bangladesh' },
+	{ icon: Handshake, title: 'Pay the seller', text: 'Agree on price and delivery directly' },
 ];
 ---
 
 <section class="container-page mt-4" aria-label="Why shop here">
 	<ul class="m-0 grid list-none gap-3 p-0 min-[720px]:grid-cols-3">
 		{
-			points.map((point) => (
+			points.map(({ icon: Icon, title, text }) => (
 				<li class="flex items-center gap-3 rounded-xl bg-surface p-4">
-					<span class="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-xl" aria-hidden="true">
-						{point.icon}
+					<span class="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-brand" aria-hidden="true">
+						<Icon className="size-5" strokeWidth={1.75} />
 					</span>
 					<span>
-						<span class="block text-sm font-semibold">{point.title}</span>
-						<span class="block text-xs text-ink-soft">{point.text}</span>
+						<span class="block text-sm font-semibold">{title}</span>
+						<span class="block text-xs text-ink-soft">{text}</span>
 					</span>
 				</li>
 			))

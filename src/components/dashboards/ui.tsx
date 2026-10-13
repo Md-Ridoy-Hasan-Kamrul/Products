@@ -69,8 +69,8 @@ export function DashboardHeader({
 				<p className="m-0 text-xs font-bold tracking-[0.16em] text-brand uppercase">{eyebrow}</p>
 				<h1 className="m-0 mt-1 text-3xl font-black">{title}</h1>
 			</div>
-			<div className="flex items-center gap-3 text-sm">
-				<span className="text-ink-soft">{user.email}</span>
+			<div className="flex min-w-0 items-center gap-3 text-sm">
+				<span className="hidden truncate text-ink-soft min-[480px]:inline">{user.email}</span>
 				<button
 					type="button"
 					onClick={logout}

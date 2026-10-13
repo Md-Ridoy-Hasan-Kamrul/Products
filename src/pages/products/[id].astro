@@ -1,5 +1,6 @@
 ---
 import type { GetStaticPaths } from 'astro';
+import { Store } from 'lucide-react';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import OrderNowButton from '../../components/products/OrderNowButton';
 import ProductGrid from '../../components/products/ProductGrid.astro';
@@ -53,7 +54,9 @@ const steps = [
 				<p class="m-0 mt-4 text-3xl font-black text-brand">{formatBdt(product.priceMinor)}</p>
 
 				<div class="mt-5 flex items-center gap-3 rounded-xl bg-canvas p-3">
-					<span class="grid size-10 place-items-center rounded-full bg-brand-soft text-lg" aria-hidden="true">🏪</span>
+					<span class="grid size-10 place-items-center rounded-full bg-brand-soft text-brand" aria-hidden="true">
+						<Store className="size-5" strokeWidth={1.75} />
+					</span>
 					<p class="m-0 text-sm">
 						<span class="block text-xs text-ink-soft">Sold by</span>
 						<span class="font-semibold">{product.vendor.name}</span>

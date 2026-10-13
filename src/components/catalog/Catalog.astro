@@ -24,11 +24,12 @@ const groups = groupByCategory(products);
 	) : (
 		groups.map(([slug, items]) => {
 			const category = categoryBySlug(slug);
+			const Icon = category.icon;
 			return (
 				<section id={`cat-${slug}`} class="mt-10 scroll-mt-40 first:mt-0" aria-labelledby={`cat-${slug}-title`}>
 					<div class="mb-4 flex items-end justify-between gap-4">
 						<h2 id={`cat-${slug}-title`} class="m-0 flex items-center gap-2 text-xl font-bold">
-							<span aria-hidden="true">{category.icon}</span>
+							<Icon className="size-5 text-brand" strokeWidth={1.75} aria-hidden="true" />
 							{category.name}
 						</h2>
 						<a href={categoryPath(slug)} class="text-sm font-semibold text-brand no-underline hover:underline">

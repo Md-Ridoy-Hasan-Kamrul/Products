@@ -45,7 +45,7 @@ function Shop({ user }: { user: SessionUser }) {
 	const catalogValue = products.reduce((sum, product) => sum + product.priceMinor, 0);
 
 	return (
-		<div className="grid gap-6">
+		<div className="grid grid-cols-1 gap-6">
 			<DashboardHeader eyebrow="Seller Center" title={vendor?.name ?? 'Your shop'} user={user} role="vendor" />
 			{error && <ErrorNote message={error} />}
 
@@ -55,16 +55,16 @@ function Shop({ user }: { user: SessionUser }) {
 				<Stat label="Commission rate" value={vendor ? `${vendor.commissionBps / 100}%` : '—'} />
 			</div>
 
-			<div className="grid items-start gap-6 min-[960px]:grid-cols-[22rem_1fr]">
+			<div className="grid grid-cols-1 items-start gap-6 min-[960px]:grid-cols-[22rem_minmax(0,1fr)]">
 				<AddProductForm onAdded={(product) => setProducts((list) => [...list, product])} />
 
 				<Panel title={`Your products (${products.length})`} id="my-products">
 					{products.length === 0 ? (
 						<p className="m-0 text-ink-soft">No products yet. Add your first one.</p>
 					) : (
-						<ul className="m-0 grid list-none gap-2 p-0">
+						<ul className="m-0 list-none divide-y divide-line p-0">
 							{products.map((product) => (
-								<li key={product.id} className="flex items-center gap-3 rounded-xl p-2 hover:bg-canvas">
+								<li key={product.id} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
 									<ProductImage
 										title={product.title}
 										imageUrl={product.imageUrl}
@@ -77,7 +77,7 @@ function Shop({ user }: { user: SessionUser }) {
 										</a>
 										<p className="m-0 text-xs text-ink-soft">{categoryBySlug(product.category).name}</p>
 									</div>
-									<p className="m-0 font-bold text-brand">{formatBdt(product.priceMinor)}</p>
+									<p className="m-0 shrink-0 font-semibold whitespace-nowrap">{formatBdt(product.priceMinor)}</p>
 								</li>
 							))}
 						</ul>
@@ -154,7 +154,7 @@ function AddProductForm({ onAdded }: { onAdded: (product: Product) => void }) {
 					<select name="category" required className={field} defaultValue={CATEGORIES[0]!.slug}>
 						{CATEGORIES.map((category) => (
 							<option key={category.slug} value={category.slug}>
-								{category.icon} {category.name}
+								{category.name}
 							</option>
 						))}
 					</select>

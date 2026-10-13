@@ -24,7 +24,7 @@ function Overview({ user }: { user: SessionUser }) {
 	}, []);
 
 	return (
-		<div className="grid gap-6">
+		<div className="grid grid-cols-1 gap-6">
 			<DashboardHeader eyebrow="Admin" title="Order intents & commission" user={user} role="admin" />
 			{error && <ErrorNote message={error} />}
 			{!summary && !error && <p className="text-ink-soft">Loading…</p>}

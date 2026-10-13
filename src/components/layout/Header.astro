@@ -60,6 +60,7 @@ const current = Astro.url.pathname;
 				CATEGORIES.map((category) => {
 					const href = categoryPath(category.slug);
 					const active = current.startsWith(href);
+					const Icon = category.icon;
 					return (
 						<li class="shrink-0">
 							<a
@@ -69,7 +70,7 @@ const current = Astro.url.pathname;
 									active ? 'bg-brand-soft font-semibold text-brand' : 'text-ink hover:bg-canvas'
 								}`}
 							>
-								<span aria-hidden="true">{category.icon}</span>
+								<Icon className="size-4 opacity-70" strokeWidth={1.75} aria-hidden="true" />
 								{category.name}
 							</a>
 						</li>

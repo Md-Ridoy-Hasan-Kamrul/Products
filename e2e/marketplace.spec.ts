@@ -115,7 +115,7 @@ test('vendor logs in, adds a product with an image, and logs out', async ({ page
 	await expect(page.getByRole('heading', { level: 1, name: 'Ghor Sajao' })).toBeVisible();
 
 	await page.getByLabel('Product name').fill(title);
-	await page.locator('select[name="category"]').selectOption({ label: '🧸 Kids & Toys' });
+	await page.locator('select[name="category"]').selectOption({ label: 'Kids & Toys' });
 	await page.getByLabel('Price (BDT)').fill('199.50');
 	await page.getByLabel('Product image').setInputFiles({ name: 'p.png', mimeType: 'image/png', buffer: PNG_1PX });
 	await page.getByRole('button', { name: 'Add product' }).click();
