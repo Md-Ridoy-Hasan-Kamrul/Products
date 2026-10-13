@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { dashboardPath, quickLogin, signIn, signOut, type Role, type SessionUser } from '../../lib/auth';
-import { ErrorNote, field, primaryButton, useRedirectIfLoggedIn } from '../dashboards/ui';
+import { ErrorNote, field, primaryButton, secondaryButton, useRedirectIfLoggedIn } from '../dashboards/ui';
 
 interface Props {
 	role: Role;
@@ -43,7 +43,7 @@ export default function LoginForm({ role, quick = false }: Props) {
 						type="button"
 						disabled={busy}
 						onClick={() => enter(() => quickLogin(role))}
-						className="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white hover:bg-black disabled:opacity-60"
+						className={`${secondaryButton} w-full`}
 					>
 						{role === 'admin' ? 'One-click admin login' : 'One-click login as Gadget Haat'}
 					</button>

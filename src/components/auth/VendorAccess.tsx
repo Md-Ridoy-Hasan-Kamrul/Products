@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { apiFetch } from '../../lib/api';
 import { dashboardPath, quickRegister, signIn } from '../../lib/auth';
-import { ErrorNote, field, primaryButton } from '../dashboards/ui';
+import { ErrorNote, field, primaryButton, secondaryButton } from '../dashboards/ui';
 import LoginForm from './LoginForm';
 
 type Mode = 'login' | 'register';
@@ -65,7 +65,7 @@ function QuickRegister() {
 				type="button"
 				disabled={busy}
 				onClick={create}
-				className="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white hover:bg-black disabled:opacity-60"
+				className={`${secondaryButton} w-full`}
 			>
 				{busy ? 'Creating your shop…' : 'One-click: create a demo shop'}
 			</button>

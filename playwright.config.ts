@@ -36,7 +36,8 @@ export default defineConfig({
 			},
 		},
 		{
-			command: 'npx astro dev --host 127.0.0.1 --port 4421',
+			// --ignore-lock lets e2e run while a regular `npm run dev` is open.
+			command: 'npx astro dev --host 127.0.0.1 --port 4421 --ignore-lock',
 			url: `${E2E_WEB_URL}/`,
 			timeout: 120_000,
 			reuseExistingServer: false,

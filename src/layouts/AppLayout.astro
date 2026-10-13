@@ -1,0 +1,19 @@
+---
+import Head from '../components/layout/Head.astro';
+
+interface Props {
+	title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<Head title={title} description="Your Products Your Dreams back office." noindex />
+	</head>
+	<body class="min-h-screen">
+		<slot />
+	</body>
+</html>

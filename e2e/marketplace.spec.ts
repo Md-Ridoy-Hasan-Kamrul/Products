@@ -114,15 +114,19 @@ test('vendor logs in, adds a product with an image, and logs out', async ({ page
 	await expect(page).toHaveURL(/\/vendor\/dashboard$/);
 	await expect(page.getByRole('heading', { level: 1, name: 'Ghor Sajao' })).toBeVisible();
 
-	await page.getByLabel('Product name').fill(title);
-	await page.locator('select[name="category"]').selectOption({ label: 'Kids & Toys' });
-	await page.getByLabel('Price (BDT)').fill('199.50');
-	await page.getByLabel('Product image').setInputFiles({ name: 'p.png', mimeType: 'image/png', buffer: PNG_1PX });
-	await page.getByRole('button', { name: 'Add product' }).click();
+	await page.getByRole('button', { name: 'Add product' }).first().click();
+	const drawer = page.getByRole('dialog', { name: 'Add a product' });
+	await drawer.getByLabel('Product name').fill(title);
+	await drawer.locator('select[name="category"]').selectOption({ label: 'Kids & Toys' });
+	await drawer.getByLabel('Price (BDT)').fill('199.50');
+	await drawer.getByLabel('Product image').setInputFiles({ name: 'p.png', mimeType: 'image/png', buffer: PNG_1PX });
+	await drawer.getByRole('button', { name: 'Save product' }).click();
 
+	await expect(drawer).toBeHidden();
 	await expect(page.getByRole('status')).toContainText(title);
-	const item = page.getByRole('listitem').filter({ hasText: title });
+	const item = page.getByRole('row').filter({ hasText: title });
 	await expect(item).toContainText('199.5');
+	await expect(item).toContainText('Kids & Toys');
 	await expect(item.getByRole('img', { name: title })).toHaveAttribute('src', new RegExp(`^${E2E_API_URL}/api/uploads/`));
 
 	await page.goto('/');
@@ -176,7 +180,7 @@ test('admin login rejects a vendor and shows commission for the admin', async ({
 
 	await logIn(page, '/admin/login', E2E_ADMIN);
 	await expect(page).toHaveURL(/\/admin\/dashboard$/);
-	await expect(page.getByRole('heading', { level: 1, name: 'Order intents & commission' })).toBeVisible();
+	await expect(page.getByRole('heading', { level: 1, name: 'Marketplace overview' })).toBeVisible();
 	await expect(page.getByRole('columnheader', { name: 'Commission owed' })).toBeVisible();
 	await expect(page.getByRole('row').filter({ hasText: 'Gadget Haat' })).toContainText('10%');
 	await expect(page.getByRole('row').filter({ hasText: 'Deshi Style' })).toBeVisible();

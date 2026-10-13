@@ -66,7 +66,7 @@
 │   │   ├── vendor/dashboard.astro    <VendorDashboard client:only="react" />
 │   │   ├── admin/login.astro         Admin লগইন
 │   │   └── admin/dashboard.astro     <AdminDashboard client:only="react" />
-│   ├── layouts/          BaseLayout.astro (Header + Footer), AuthLayout.astro
+│   ├── layouts/          BaseLayout.astro (দোকান: Header + Footer), AppLayout.astro (ড্যাশবোর্ড), AuthLayout.astro (লগইন)
 │   ├── components/
 │   │   ├── layout/       Header.astro (সার্চ বার, ক্যাটাগরি nav), Footer.astro, Logo.astro
 │   │   ├── home/         Hero.astro, TrustStrip.astro, CategoryTiles.astro
@@ -74,7 +74,7 @@
 │   │   ├── products/     ProductCard, ProductGrid, OrderNowButton, ProductImage, WhatsAppIcon
 │   │   ├── search/       SearchResults.tsx
 │   │   ├── auth/         LoginForm.tsx, VendorAccess.tsx
-│   │   └── dashboards/   VendorDashboard.tsx, AdminDashboard.tsx, ui.tsx (লগইন চেক, কার্ড)
+│   │   └── dashboards/   VendorDashboard.tsx, AdminDashboard.tsx, ui.tsx (লগইন চেক, sidebar shell, কার্ড, টেবিল)
 │   ├── lib/              api.ts, auth.ts, whatsapp.ts, categories.ts, format.ts, types.ts
 │   └── styles/global.css কমলা brand, Order Now সবুজ
 ├── scripts/dev.mjs   Web + API একসাথে চালায়

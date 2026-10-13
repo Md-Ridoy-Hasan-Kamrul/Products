@@ -1,12 +1,10 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
 import VendorDashboard from '../../components/dashboards/VendorDashboard';
+import AppLayout from '../../layouts/AppLayout.astro';
 ---
 
-<BaseLayout title="Seller Center — Your Products Your Dreams" noindex>
-	<div class="container-page py-8">
-		<VendorDashboard client:only="react">
-			<p slot="fallback" class="text-ink-soft">Loading…</p>
-		</VendorDashboard>
-	</div>
-</BaseLayout>
+<AppLayout title="Seller Center — Your Products Your Dreams">
+	<VendorDashboard client:only="react">
+		<div slot="fallback" class="grid min-h-screen place-items-center bg-canvas text-sm text-ink-soft">Loading…</div>
+	</VendorDashboard>
+</AppLayout>
