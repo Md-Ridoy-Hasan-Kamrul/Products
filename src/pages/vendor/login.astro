@@ -1,0 +1,10 @@
+---
+import VendorAccess from '../../components/auth/VendorAccess';
+import AuthLayout from '../../layouts/AuthLayout.astro';
+---
+
+<AuthLayout title="Seller Center — Your Products Your Dreams" heading="Seller Center" subheading="Log in to manage your shop.">
+	<VendorAccess quick={import.meta.env.DEV} client:only="react">
+		<p slot="fallback" class="text-ink-soft">Loading…</p>
+	</VendorAccess>
+</AuthLayout>

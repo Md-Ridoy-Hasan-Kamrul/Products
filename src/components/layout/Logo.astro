@@ -1,0 +1,19 @@
+---
+interface Props {
+	tone?: 'light' | 'dark';
+}
+
+const { tone = 'light' } = Astro.props;
+const text = tone === 'light' ? 'text-white' : 'text-ink';
+---
+
+<a href="/" class={`flex shrink-0 items-center gap-2 no-underline ${text}`} aria-label="Your Products Your Dreams, home">
+	<span
+		class={`grid size-9 place-items-center rounded-lg text-lg font-black ${tone === 'light' ? 'bg-white text-brand' : 'bg-brand text-white'}`}
+		aria-hidden="true">Y</span
+	>
+	<span class="leading-none">
+		<span class="block text-[0.95rem] font-extrabold tracking-tight">Your Products</span>
+		<span class="block text-[0.7rem] font-semibold tracking-[0.18em] uppercase opacity-85">Your Dreams</span>
+	</span>
+</a>

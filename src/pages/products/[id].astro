@@ -1,0 +1,105 @@
+---
+import type { GetStaticPaths } from 'astro';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import OrderNowButton from '../../components/products/OrderNowButton';
+import ProductGrid from '../../components/products/ProductGrid.astro';
+import ProductImage from '../../components/products/ProductImage';
+import { loadCatalog } from '../../lib/api';
+import { categoryBySlug, categoryPath } from '../../lib/categories';
+import { formatBdt } from '../../lib/format';
+import type { Product } from '../../lib/types';
+
+export const getStaticPaths = (async () => {
+	const { products } = await loadCatalog();
+	return products.map((product) => ({
+		params: { id: product.id },
+		props: {
+			product,
+			related: products.filter((other) => other.category === product.category && other.id !== product.id).slice(0, 5),
+		},
+	}));
+}) satisfies GetStaticPaths;
+
+interface Props {
+	product: Product;
+	related: Product[];
+}
+
+const { product, related } = Astro.props;
+const category = categoryBySlug(product.category);
+const steps = [
+	'Tap Order Now. WhatsApp opens with this product already in the message.',
+	'Agree on size, colour, delivery, and price with the seller.',
+	'Pay the seller as you agree, often cash on delivery.',
+];
+---
+
+<BaseLayout title={`${product.title} — Your Products Your Dreams`} description={product.description || product.title}>
+	<div class="container-page pt-6">
+		<nav aria-label="Breadcrumb" class="text-sm text-ink-soft">
+			<ol class="m-0 flex list-none flex-wrap gap-1.5 p-0">
+				<li><a href="/" class="text-ink-soft no-underline hover:text-brand">Home</a> /</li>
+				<li>
+					<a href={categoryPath(category.slug)} class="text-ink-soft no-underline hover:text-brand">{category.name}</a> /
+				</li>
+				<li aria-current="page" class="truncate text-ink">{product.title}</li>
+			</ol>
+		</nav>
+
+		<div class="mt-4 grid gap-6 rounded-2xl bg-surface p-4 min-[720px]:grid-cols-[minmax(0,26rem)_1fr] min-[720px]:p-6">
+			<ProductImage title={product.title} imageUrl={product.imageUrl} category={product.category} />
+			<div class="flex flex-col">
+				<h1 class="m-0 text-2xl leading-tight font-bold min-[720px]:text-3xl">{product.title}</h1>
+				<p class="m-0 mt-4 text-3xl font-black text-brand">{formatBdt(product.priceMinor)}</p>
+
+				<div class="mt-5 flex items-center gap-3 rounded-xl bg-canvas p-3">
+					<span class="grid size-10 place-items-center rounded-full bg-brand-soft text-lg" aria-hidden="true">🏪</span>
+					<p class="m-0 text-sm">
+						<span class="block text-xs text-ink-soft">Sold by</span>
+						<span class="font-semibold">{product.vendor.name}</span>
+					</p>
+				</div>
+
+				<div class="mt-6 max-w-sm">
+					<OrderNowButton product={product} origin={Astro.url.origin} size="lg" client:load />
+				</div>
+
+				{
+					product.description && (
+						<section class="mt-8" aria-labelledby="details-title">
+							<h2 id="details-title" class="m-0 text-base font-bold">Details</h2>
+							<p class="m-0 mt-2 text-ink-soft">{product.description}</p>
+						</section>
+					)
+				}
+
+				<section class="mt-8" aria-labelledby="how-title">
+					<h2 id="how-title" class="m-0 text-base font-bold">How ordering works</h2>
+					<ol class="m-0 mt-3 grid list-none gap-3 p-0">
+						{
+							steps.map((step, index) => (
+								<li class="flex gap-3 text-sm text-ink-soft">
+									<span class="grid size-6 shrink-0 place-items-center rounded-full bg-brand text-xs font-bold text-white">
+										{index + 1}
+									</span>
+									{step}
+								</li>
+							))
+						}
+					</ol>
+				</section>
+			</div>
+		</div>
+
+		{
+			related.length > 0 && (
+				<section class="mt-12" aria-labelledby="related-title">
+					<h2 id="related-title" class="m-0 mb-4 text-xl font-bold">
+						More in {category.name}
+					</h2>
+					<ProductGrid products={related} />
+				</section>
+			)
+		}
+	</div>
+</BaseLayout>

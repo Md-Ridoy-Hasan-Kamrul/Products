@@ -1,0 +1,43 @@
+---
+import { categoryBySlug, categoryPath } from '../../lib/categories';
+import { groupByCategory } from '../../lib/format';
+import type { Product } from '../../lib/types';
+import ProductGrid from '../products/ProductGrid.astro';
+
+interface Props {
+	products: Product[];
+	/** Shown in dev only, so a stopped API is obvious instead of an empty shop. */
+	devError?: string | null;
+}
+
+const { products, devError = null } = Astro.props;
+const groups = groupByCategory(products);
+---
+
+{
+	devError ? (
+		<p role="alert" class="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+			<strong>Dev:</strong> {devError} Or run <code>npm run dev</code>, which starts the web and API together.
+		</p>
+	) : groups.length === 0 ? (
+		<p class="rounded-xl bg-surface p-10 text-center text-ink-soft">No products to show right now.</p>
+	) : (
+		groups.map(([slug, items]) => {
+			const category = categoryBySlug(slug);
+			return (
+				<section id={`cat-${slug}`} class="mt-10 scroll-mt-40 first:mt-0" aria-labelledby={`cat-${slug}-title`}>
+					<div class="mb-4 flex items-end justify-between gap-4">
+						<h2 id={`cat-${slug}-title`} class="m-0 flex items-center gap-2 text-xl font-bold">
+							<span aria-hidden="true">{category.icon}</span>
+							{category.name}
+						</h2>
+						<a href={categoryPath(slug)} class="text-sm font-semibold text-brand no-underline hover:underline">
+							See all <span aria-hidden="true">→</span>
+						</a>
+					</div>
+					<ProductGrid products={items} />
+				</section>
+			);
+		})
+	)
+}

@@ -1,0 +1,22 @@
+---
+import type { Product } from '../../lib/types';
+import ProductCard from './ProductCard';
+
+interface Props {
+	products: Product[];
+}
+
+const { products } = Astro.props;
+---
+
+<ul
+	class="m-0 grid list-none grid-cols-2 gap-3 p-0 min-[640px]:grid-cols-3 min-[640px]:gap-4 min-[960px]:grid-cols-4 min-[1200px]:grid-cols-5"
+>
+	{
+		products.map((product) => (
+			<li>
+				<ProductCard product={product} origin={Astro.url.origin} client:visible />
+			</li>
+		))
+	}
+</ul>

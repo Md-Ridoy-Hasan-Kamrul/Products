@@ -1,0 +1,21 @@
+---
+import BaseLayout from './BaseLayout.astro';
+
+interface Props {
+	title: string;
+	heading: string;
+	subheading: string;
+}
+
+const { title, heading, subheading } = Astro.props;
+---
+
+<BaseLayout title={title} noindex>
+	<div class="container-page grid place-items-center py-12">
+		<div class="w-full max-w-md rounded-2xl bg-surface p-6 shadow-[0_6px_24px_rgb(0_0_0/0.06)] min-[480px]:p-8">
+			<h1 class="m-0 text-2xl font-black">{heading}</h1>
+			<p class="m-0 mt-1 mb-6 text-sm text-ink-soft">{subheading}</p>
+			<slot />
+		</div>
+	</div>
+</BaseLayout>

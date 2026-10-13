@@ -1,0 +1,12 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdminDashboard from '../../components/dashboards/AdminDashboard';
+---
+
+<BaseLayout title="Admin Dashboard — Your Products Your Dreams" noindex>
+	<div class="container-page py-8">
+		<AdminDashboard client:only="react">
+			<p slot="fallback" class="text-ink-soft">Loading…</p>
+		</AdminDashboard>
+	</div>
+</BaseLayout>

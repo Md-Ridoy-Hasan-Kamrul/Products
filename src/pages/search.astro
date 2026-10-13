@@ -1,0 +1,10 @@
+---
+import SearchResults from '../components/search/SearchResults';
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Search — Your Products Your Dreams" noindex>
+	<div class="container-page pt-6">
+		<SearchResults client:only="react" />
+	</div>
+</BaseLayout>

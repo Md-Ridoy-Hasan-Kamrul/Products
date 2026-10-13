@@ -1,0 +1,50 @@
+---
+import type { GetStaticPaths } from 'astro';
+import ProductGrid from '../../components/products/ProductGrid.astro';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { loadCatalog } from '../../lib/api';
+import { CATEGORIES, type Category } from '../../lib/categories';
+import type { Product } from '../../lib/types';
+
+export const getStaticPaths = (async () => {
+	const { products } = await loadCatalog();
+	return CATEGORIES.map((category) => ({
+		params: { slug: category.slug },
+		props: { category, products: products.filter((product) => product.category === category.slug) },
+	}));
+}) satisfies GetStaticPaths;
+
+interface Props {
+	category: Category;
+	products: Product[];
+}
+
+const { category, products } = Astro.props;
+---
+
+<BaseLayout title={`${category.name} — Your Products Your Dreams`} description={`Shop ${category.name} from local sellers.`}>
+	<div class="container-page pt-6">
+		<div class="flex items-center gap-4 rounded-2xl p-6" style={`background-color: ${category.tint}`}>
+			<span class="grid size-16 place-items-center rounded-full bg-white/70 text-4xl" aria-hidden="true">
+				{category.icon}
+			</span>
+			<div>
+				<h1 class="m-0 text-2xl font-black">{category.name}</h1>
+				<p class="m-0 text-sm text-ink-soft">
+					{products.length} {products.length === 1 ? 'product' : 'products'}
+				</p>
+			</div>
+		</div>
+		<div class="mt-6">
+			{
+				products.length > 0 ? (
+					<ProductGrid products={products} />
+				) : (
+					<p class="rounded-xl bg-surface p-10 text-center text-ink-soft">
+						No products in this category yet. <a href="/" class="font-semibold text-brand">Browse everything</a>
+					</p>
+				)
+			}
+		</div>
+	</div>
+</BaseLayout>

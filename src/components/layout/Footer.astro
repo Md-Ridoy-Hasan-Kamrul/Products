@@ -1,0 +1,40 @@
+---
+import { CATEGORIES, categoryPath } from '../../lib/categories';
+import Logo from './Logo.astro';
+
+const year = new Date().getFullYear();
+---
+
+<footer class="mt-16 bg-ink text-white/75">
+	<div class="container-page grid gap-10 py-12 min-[720px]:grid-cols-[1.4fr_1fr_1fr]">
+		<div>
+			<Logo />
+			<p class="m-0 mt-4 max-w-sm text-sm">
+				A marketplace of local sellers. Find what you love and order straight from the shop on WhatsApp.
+			</p>
+		</div>
+		<nav aria-label="Shop by category">
+			<p class="m-0 mb-3 text-sm font-semibold text-white">Shop</p>
+			<ul class="m-0 grid list-none gap-2 p-0 text-sm">
+				{
+					CATEGORIES.slice(0, 5).map((category) => (
+						<li>
+							<a href={categoryPath(category.slug)} class="text-white/75 no-underline hover:text-white">
+								{category.name}
+							</a>
+						</li>
+					))
+				}
+			</ul>
+		</nav>
+		<nav aria-label="Sellers">
+			<p class="m-0 mb-3 text-sm font-semibold text-white">Sell with us</p>
+			<ul class="m-0 grid list-none gap-2 p-0 text-sm">
+				<li><a href="/vendor/login?mode=register" class="text-white/75 no-underline hover:text-white">Become a seller</a></li>
+				<li><a href="/vendor/login" class="text-white/75 no-underline hover:text-white">Vendor login</a></li>
+				<li><a href="/admin/login" class="text-white/75 no-underline hover:text-white">Admin login</a></li>
+			</ul>
+		</nav>
+	</div>
+	<p class="m-0 border-t border-white/10 py-5 text-center text-xs">© {year} Your Products Your Dreams</p>
+</footer>

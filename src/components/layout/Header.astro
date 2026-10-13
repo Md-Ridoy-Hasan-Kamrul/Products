@@ -1,0 +1,81 @@
+---
+import { CATEGORIES, categoryPath } from '../../lib/categories';
+import Logo from './Logo.astro';
+
+const current = Astro.url.pathname;
+---
+
+<header class="sticky top-0 z-40 shadow-[0_1px_0_var(--color-line)]">
+	<div class="hidden bg-ink text-xs text-white/80 min-[720px]:block">
+		<div class="container-page flex h-8 items-center justify-between">
+			<p class="m-0">Order directly from trusted sellers on WhatsApp</p>
+			<nav class="flex gap-5" aria-label="Account">
+				<a href="/vendor/login" class="text-white/80 no-underline hover:text-white">Vendor login</a>
+				<a href="/admin/login" class="text-white/80 no-underline hover:text-white">Admin login</a>
+			</nav>
+		</div>
+	</div>
+
+	<div class="bg-brand">
+		<div class="container-page flex flex-wrap items-center gap-x-6 gap-y-3 py-3">
+			<Logo />
+			<form
+				action="/search"
+				method="get"
+				role="search"
+				class="order-last flex w-full min-w-0 overflow-hidden rounded-lg bg-white min-[720px]:order-none min-[720px]:w-auto min-[720px]:flex-1"
+			>
+				<label for="site-search" class="sr-only">Search products</label>
+				<input
+					id="site-search"
+					name="q"
+					type="search"
+					required
+					maxlength="100"
+					placeholder="Search for products, brands, or shops"
+					class="min-w-0 flex-1 border-0 bg-transparent px-4 py-2.5 text-sm text-ink outline-none"
+				/>
+				<button
+					type="submit"
+					class="flex items-center gap-2 bg-brand-deep px-4 text-sm font-semibold text-white hover:bg-ink"
+				>
+					<svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+						<circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path>
+					</svg>
+					<span class="hidden min-[480px]:inline">Search</span>
+				</button>
+			</form>
+			<a
+				href="/vendor/dashboard"
+				class="ml-auto rounded-lg border border-white/60 px-3 py-2 text-sm font-semibold text-white no-underline hover:bg-white hover:text-brand min-[720px]:ml-0"
+			>
+				Seller Center
+			</a>
+		</div>
+	</div>
+
+	<nav class="bg-surface" aria-label="Categories">
+		<ul class="container-page m-0 flex list-none gap-1 overflow-x-auto p-0 py-1.5 [scrollbar-width:none]">
+			{
+				CATEGORIES.map((category) => {
+					const href = categoryPath(category.slug);
+					const active = current.startsWith(href);
+					return (
+						<li class="shrink-0">
+							<a
+								href={href}
+								aria-current={active ? 'page' : undefined}
+								class={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm whitespace-nowrap no-underline ${
+									active ? 'bg-brand-soft font-semibold text-brand' : 'text-ink hover:bg-canvas'
+								}`}
+							>
+								<span aria-hidden="true">{category.icon}</span>
+								{category.name}
+							</a>
+						</li>
+					);
+				})
+			}
+		</ul>
+	</nav>
+</header>

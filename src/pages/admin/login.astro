@@ -1,0 +1,10 @@
+---
+import LoginForm from '../../components/auth/LoginForm';
+import AuthLayout from '../../layouts/AuthLayout.astro';
+---
+
+<AuthLayout title="Admin login — Your Products Your Dreams" heading="Admin login" subheading="Order intents and vendor commission.">
+	<LoginForm role="admin" quick={import.meta.env.DEV} client:only="react">
+		<p slot="fallback" class="text-ink-soft">Loading…</p>
+	</LoginForm>
+</AuthLayout>

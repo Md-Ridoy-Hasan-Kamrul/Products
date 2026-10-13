@@ -1,0 +1,48 @@
+---
+import '../styles/global.css';
+import '@fontsource-variable/figtree';
+import Footer from '../components/layout/Footer.astro';
+import Header from '../components/layout/Header.astro';
+
+interface Props {
+	title?: string;
+	description?: string;
+	noindex?: boolean;
+}
+
+const {
+	title = 'Your Products Your Dreams',
+	description = 'Shop from trusted local sellers and order straight on WhatsApp.',
+	noindex = false,
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, Astro.site ?? Astro.url.origin).href;
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width" />
+		<meta name="theme-color" content="#f2541b" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		<meta name="description" content={description} />
+		{noindex && <meta name="robots" content="noindex" />}
+		<link rel="canonical" href={canonical} />
+		<title>{title}</title>
+	</head>
+	<body class="flex min-h-screen flex-col">
+		<a
+			href="#main"
+			class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:rounded focus:bg-brand focus:px-3 focus:py-2 focus:text-white"
+		>
+			Skip to content
+		</a>
+		<Header />
+		<main id="main" class="flex-1">
+			<slot />
+		</main>
+		<Footer />
+	</body>
+</html>

@@ -1,0 +1,20 @@
+---
+import Catalog from '../components/catalog/Catalog.astro';
+import CategoryTiles from '../components/home/CategoryTiles.astro';
+import Hero from '../components/home/Hero.astro';
+import TrustStrip from '../components/home/TrustStrip.astro';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { loadCatalog } from '../lib/api';
+
+const { products, error } = await loadCatalog();
+---
+
+<BaseLayout>
+	<Hero />
+	<TrustStrip />
+	<CategoryTiles />
+	<section id="shop" class="container-page mt-12 scroll-mt-40" aria-labelledby="shop-title">
+		<h2 id="shop-title" class="m-0 mb-6 text-2xl font-black">Just for you</h2>
+		<Catalog products={products} devError={import.meta.env.DEV ? error : null} />
+	</section>
+</BaseLayout>

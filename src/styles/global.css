@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@theme {
+	--font-body: "Figtree Variable", "Figtree", system-ui, sans-serif;
+	--color-brand: #f2541b;
+	--color-brand-deep: #c93f0d;
+	--color-brand-soft: #fff1ea;
+	--color-ink: #1b1f24;
+	--color-ink-soft: #5b6470;
+	--color-canvas: #f3f4f6;
+	--color-surface: #ffffff;
+	--color-line: rgb(27 31 36 / 0.1);
+	--color-wa: #15803d;
+	--color-wa-deep: #166534;
+}
+
+@layer base {
+	html {
+		scroll-behavior: smooth;
+	}
+
+	body {
+		min-height: 100%;
+		margin: 0;
+		font-family: var(--font-body);
+		font-size: 1rem;
+		line-height: 1.55;
+		color: var(--color-ink);
+		background: var(--color-canvas);
+	}
+
+	:disabled {
+		cursor: not-allowed;
+	}
+}
+
+@utility container-page {
+	margin-inline: auto;
+	width: min(100% - 2rem, 80rem);
+}
