@@ -12,6 +12,20 @@ const NewProductBody = z.object({
 	imageUrl: z.url({ protocol: /^https?$/ }).nullable().default(null),
 });
 
+const ProductChangesBody = z
+	.object({
+		title: NewProductBody.shape.title,
+		description: z.string().trim().max(2000),
+		category: NewProductBody.shape.category,
+		priceMinor: NewProductBody.shape.priceMinor,
+		imageUrl: z.url({ protocol: /^https?$/ }).nullable(),
+	})
+	.partial()
+	.strict()
+	.refine((changes) => Object.keys(changes).length > 0, 'Nothing to update');
+
+const ProductParams = z.object({ id: z.string().min(1).max(100) });
+
 /** Accepts 01XXXXXXXXX, 8801XXXXXXXXX, or +880 1XXX-XXXXXX and returns 8801XXXXXXXXX. */
 const BdPhone = z
 	.string()
@@ -69,6 +83,25 @@ export function vendorRouter(store: MemoryStore, auth: Auth) {
 		const body = NewProductBody.parse(req.body);
 		const product = store.addProduct({ ...body, vendorId: res.locals.vendor!.id });
 		res.status(201).json({ product: store.getProduct(product.id) });
+	});
+
+	router.patch('/products/:id', (req, res) => {
+		const { id } = ProductParams.parse(req.params);
+		const product = store.updateProduct(id, res.locals.vendor!.id, ProductChangesBody.parse(req.body));
+		if (!product) {
+			res.status(404).json({ error: 'Product not found' });
+			return;
+		}
+		res.json({ product });
+	});
+
+	router.delete('/products/:id', (req, res) => {
+		const { id } = ProductParams.parse(req.params);
+		if (!store.deleteProduct(id, res.locals.vendor!.id)) {
+			res.status(404).json({ error: 'Product not found' });
+			return;
+		}
+		res.status(204).end();
 	});
 
 	return router;

@@ -133,6 +133,23 @@ test('vendor logs in, adds a product with an image, and logs out', async ({ page
 	await expect(page.locator('#cat-kids-toys').getByRole('link', { name: title, exact: true })).toBeVisible();
 
 	await page.goto('/vendor/dashboard');
+	await page.getByRole('button', { name: `Edit ${title}` }).click();
+	const editor = page.getByRole('dialog', { name: 'Edit product' });
+	await expect(editor.getByLabel('Product name')).toHaveValue(title);
+	await editor.getByLabel('Price (BDT)').fill('249');
+	await editor.getByRole('button', { name: 'Save changes' }).click();
+	await expect(page.getByRole('status')).toContainText('was updated');
+	await expect(page.getByRole('row').filter({ hasText: title })).toContainText('249.00');
+
+	await page.getByRole('button', { name: `Delete ${title}` }).click();
+	const confirm = page.getByRole('alertdialog', { name: 'Delete this product?' });
+	await confirm.getByRole('button', { name: 'Cancel' }).click();
+	await expect(page.getByRole('row').filter({ hasText: title })).toBeVisible();
+	await page.getByRole('button', { name: `Delete ${title}` }).click();
+	await confirm.getByRole('button', { name: 'Delete product' }).click();
+	await expect(page.getByRole('status')).toContainText('was deleted');
+	await expect(page.getByRole('row').filter({ hasText: title })).toHaveCount(0);
+
 	await page.getByRole('button', { name: 'Log out' }).click();
 	await expect(page).toHaveURL(/\/vendor\/login$/);
 	await page.goto('/vendor/dashboard');

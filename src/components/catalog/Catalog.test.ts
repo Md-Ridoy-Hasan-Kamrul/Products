@@ -17,6 +17,7 @@ function product(id: string, title: string, category: string): Product {
 		priceMinor: 25_000,
 		imageUrl: null,
 		createdAt: '',
+		updatedAt: '',
 		vendor,
 	};
 }

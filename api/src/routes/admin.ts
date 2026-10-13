@@ -21,7 +21,7 @@ export function adminRouter(store: MemoryStore, auth: Auth) {
 			recentOrderIntents: intents
 				.slice(-20)
 				.reverse()
-				.map((intent) => ({ ...intent, productTitle: store.getProduct(intent.productId)?.title ?? null })),
+				.map((intent) => ({ ...intent, productTitle: store.getProduct(intent.productId, { includeDeleted: true })?.title ?? null })),
 		});
 	});
 

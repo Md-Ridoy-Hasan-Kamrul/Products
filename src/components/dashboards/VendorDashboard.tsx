@@ -1,5 +1,5 @@
-import { CheckCircle2, ImagePlus, Package, Percent, Plus, Wallet, X } from 'lucide-react';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { CheckCircle2, ImagePlus, Package, Pencil, Percent, Plus, Trash2, Wallet, X } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { apiFetch } from '../../lib/api';
 import type { SessionUser } from '../../lib/auth';
 import { CATEGORIES, categoryBySlug } from '../../lib/categories';
@@ -26,6 +26,9 @@ import {
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const addedOn = new Intl.DateTimeFormat('en-BD', { dateStyle: 'medium' });
+const iconButton = 'rounded-lg p-2 text-ink-soft hover:bg-canvas hover:text-ink';
+
+type Editing = { mode: 'add' } | { mode: 'edit'; product: Product };
 
 function readAsDataUrl(file: File): Promise<string> {
 	return new Promise((resolve, reject) => {
@@ -45,7 +48,8 @@ function Shop({ user }: { user: SessionUser }) {
 	const [vendor, setVendor] = useState<Vendor | null>(null);
 	const [products, setProducts] = useState<Product[]>([]);
 	const [error, setError] = useState<string | null>(null);
-	const [adding, setAdding] = useState(false);
+	const [editing, setEditing] = useState<Editing | null>(null);
+	const [deleting, setDeleting] = useState<Product | null>(null);
 	const [notice, setNotice] = useState<string | null>(null);
 
 	useEffect(() => {
@@ -62,10 +66,27 @@ function Shop({ user }: { user: SessionUser }) {
 
 	const catalogValue = products.reduce((sum, product) => sum + product.priceMinor, 0);
 	const addButton = (
-		<button type="button" className={primaryButton} onClick={() => setAdding(true)}>
+		<button type="button" className={primaryButton} onClick={() => setEditing({ mode: 'add' })}>
 			<Plus className="size-4" aria-hidden="true" /> Add product
 		</button>
 	);
+
+	function saved(product: Product) {
+		const isNew = editing?.mode === 'add';
+		setProducts((list) => (isNew ? [product, ...list] : list.map((p) => (p.id === product.id ? product : p))));
+		setEditing(null);
+		setNotice(
+			isNew
+				? `“${product.title}” is live. It shows on the storefront after the next build.`
+				: `“${product.title}” was updated.`,
+		);
+	}
+
+	function deleted(product: Product) {
+		setProducts((list) => list.filter((p) => p.id !== product.id));
+		setDeleting(null);
+		setNotice(`“${product.title}” was deleted.`);
+	}
 
 	return (
 		<DashboardShell
@@ -112,6 +133,9 @@ function Shop({ user }: { user: SessionUser }) {
 									<th className={`${th} text-right`}>Price</th>
 									<th className={th}>Status</th>
 									<th className={th}>Added</th>
+									<th className={`${th} text-right`}>
+										<span className="sr-only">Actions</span>
+									</th>
 								</tr>
 							</thead>
 							<tbody className="[&>tr:last-child>td]:border-b-0">
@@ -139,6 +163,28 @@ function Shop({ user }: { user: SessionUser }) {
 											<Badge tone="success">Live</Badge>
 										</td>
 										<td className={`${td} text-ink-soft`}>{addedOn.format(new Date(product.createdAt))}</td>
+										<td className={`${td} text-right`}>
+											<div className="inline-flex gap-1">
+												<button
+													type="button"
+													className={iconButton}
+													aria-label={`Edit ${product.title}`}
+													title="Edit"
+													onClick={() => setEditing({ mode: 'edit', product })}
+												>
+													<Pencil className="size-4" aria-hidden="true" />
+												</button>
+												<button
+													type="button"
+													className={`${iconButton} hover:bg-red-50 hover:text-red-700`}
+													aria-label={`Delete ${product.title}`}
+													title="Delete"
+													onClick={() => setDeleting(product)}
+												>
+													<Trash2 className="size-4" aria-hidden="true" />
+												</button>
+											</div>
+										</td>
 									</tr>
 								))}
 							</tbody>
@@ -147,28 +193,21 @@ function Shop({ user }: { user: SessionUser }) {
 				)}
 			</Card>
 
-			{adding && (
-				<AddProductDrawer
-					onClose={() => setAdding(false)}
-					onAdded={(product) => {
-						setProducts((list) => [product, ...list]);
-						setAdding(false);
-						setNotice(`“${product.title}” is live. It shows on the storefront after the next build.`);
-					}}
+			{editing && (
+				<ProductDrawer
+					product={editing.mode === 'edit' ? editing.product : null}
+					onClose={() => setEditing(null)}
+					onSaved={saved}
 				/>
 			)}
+			{deleting && <DeleteDialog product={deleting} onClose={() => setDeleting(null)} onDeleted={deleted} />}
 		</DashboardShell>
 	);
 }
 
-function AddProductDrawer({ onClose, onAdded }: { onClose: () => void; onAdded: (product: Product) => void }) {
-	const [saving, setSaving] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [preview, setPreview] = useState<string | null>(null);
-	const firstField = useRef<HTMLInputElement>(null);
-
+/** Closes on Escape and locks page scroll while a panel or dialog is open. */
+function useModal(onClose: () => void) {
 	useEffect(() => {
-		firstField.current?.focus();
 		const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
 		window.addEventListener('keydown', onKey);
 		document.body.style.overflow = 'hidden';
@@ -177,8 +216,40 @@ function AddProductDrawer({ onClose, onAdded }: { onClose: () => void; onAdded: 
 			document.body.style.overflow = '';
 		};
 	}, [onClose]);
+}
 
+function Backdrop({ onClose }: { onClose: () => void }) {
+	return <button type="button" aria-label="Close" tabIndex={-1} className="absolute inset-0 bg-ink/40" onClick={onClose} />;
+}
+
+function ProductDrawer({
+	product,
+	onClose,
+	onSaved,
+}: {
+	/** null to add a new product. */
+	product: Product | null;
+	onClose: () => void;
+	onSaved: (product: Product) => void;
+}) {
+	const [saving, setSaving] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const [preview, setPreview] = useState<string | null>(null);
+	const [keptImage, setKeptImage] = useState<string | null>(product?.imageUrl ?? null);
+	const fileInput = useRef<HTMLInputElement>(null);
+	const firstField = useRef<HTMLInputElement>(null);
+	useModal(onClose);
+	useEffect(() => firstField.current?.focus(), []);
 	useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
+
+	const shownImage = preview ?? keptImage;
+	const heading = product ? 'Edit product' : 'Add a product';
+
+	function removeImage() {
+		setPreview(null);
+		setKeptImage(null);
+		if (fileInput.current) fileInput.current.value = '';
+	}
 
 	async function submit(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
@@ -194,7 +265,7 @@ function AddProductDrawer({ onClose, onAdded }: { onClose: () => void; onAdded: 
 
 		setSaving(true);
 		try {
-			let imageUrl: string | null = null;
+			let imageUrl = keptImage;
 			if (image) {
 				const upload = await apiFetch<{ url: string }>('/api/uploads', {
 					method: 'POST',
@@ -203,17 +274,20 @@ function AddProductDrawer({ onClose, onAdded }: { onClose: () => void; onAdded: 
 				imageUrl = upload.url;
 			}
 
-			const { product } = await apiFetch<{ product: Product }>('/api/vendor/products', {
-				method: 'POST',
-				body: JSON.stringify({
-					title: data.get('title'),
-					description: data.get('description'),
-					category: data.get('category'),
-					priceMinor: Math.round(Number(data.get('price')) * 100),
-					imageUrl,
-				}),
+			const body = JSON.stringify({
+				title: data.get('title'),
+				description: data.get('description'),
+				category: data.get('category'),
+				priceMinor: Math.round(Number(data.get('price')) * 100),
+				imageUrl,
 			});
-			onAdded(product);
+			const { product: result } = product
+				? await apiFetch<{ product: Product }>(`/api/vendor/products/${encodeURIComponent(product.id)}`, {
+						method: 'PATCH',
+						body,
+					})
+				: await apiFetch<{ product: Product }>('/api/vendor/products', { method: 'POST', body });
+			onSaved(result);
 		} catch (e) {
 			setError((e as Error).message);
 			setSaving(false);
@@ -222,21 +296,23 @@ function AddProductDrawer({ onClose, onAdded }: { onClose: () => void; onAdded: 
 
 	return (
 		<div className="fixed inset-0 z-50 flex justify-end">
-			<button type="button" aria-label="Close" tabIndex={-1} className="absolute inset-0 bg-ink/40" onClick={onClose} />
+			<Backdrop onClose={onClose} />
 			<div
 				role="dialog"
 				aria-modal="true"
-				aria-labelledby="add-product-title"
+				aria-labelledby="product-drawer-title"
 				className="relative flex h-full w-full max-w-lg flex-col bg-surface shadow-2xl"
 			>
 				<div className="flex items-center justify-between border-b border-line px-6 py-4">
 					<div>
-						<h2 id="add-product-title" className="m-0 text-lg font-semibold">
-							Add a product
+						<h2 id="product-drawer-title" className="m-0 text-lg font-semibold">
+							{heading}
 						</h2>
-						<p className="m-0 text-sm text-ink-soft">It goes live as soon as you save.</p>
+						<p className="m-0 text-sm text-ink-soft">
+							{product ? 'Changes go live as soon as you save.' : 'It goes live as soon as you save.'}
+						</p>
 					</div>
-					<button type="button" onClick={onClose} className="rounded-lg p-2 text-ink-soft hover:bg-canvas hover:text-ink">
+					<button type="button" onClick={onClose} className={iconButton}>
 						<X className="size-5" aria-hidden="true" />
 						<span className="sr-only">Close panel</span>
 					</button>
@@ -246,12 +322,20 @@ function AddProductDrawer({ onClose, onAdded }: { onClose: () => void; onAdded: 
 					<div className="grid flex-1 content-start gap-5 overflow-y-auto px-6 py-5">
 						<label className="text-sm font-medium">
 							Product name
-							<input ref={firstField} name="title" required minLength={2} maxLength={200} className={field} />
+							<input
+								ref={firstField}
+								name="title"
+								required
+								minLength={2}
+								maxLength={200}
+								defaultValue={product?.title}
+								className={field}
+							/>
 						</label>
 						<div className="grid gap-5 min-[480px]:grid-cols-2">
 							<label className="text-sm font-medium">
 								Category
-								<select name="category" required className={field} defaultValue={CATEGORIES[0]!.slug}>
+								<select name="category" required className={field} defaultValue={product?.category ?? CATEGORIES[0]!.slug}>
 									{CATEGORIES.map((category) => (
 										<option key={category.slug} value={category.slug}>
 											{category.name}
@@ -269,6 +353,7 @@ function AddProductDrawer({ onClose, onAdded }: { onClose: () => void; onAdded: 
 									step="0.01"
 									inputMode="decimal"
 									placeholder="0.00"
+									defaultValue={product ? product.priceMinor / 100 : undefined}
 									className={field}
 								/>
 							</label>
@@ -280,6 +365,7 @@ function AddProductDrawer({ onClose, onAdded }: { onClose: () => void; onAdded: 
 								rows={4}
 								maxLength={2000}
 								placeholder="Size, material, what's in the box…"
+								defaultValue={product?.description}
 								className={field}
 							/>
 						</label>
@@ -287,23 +373,32 @@ function AddProductDrawer({ onClose, onAdded }: { onClose: () => void; onAdded: 
 							<label htmlFor="product-image">
 								Product image <span className="font-normal text-ink-soft">(optional)</span>
 							</label>
-							<label
-								htmlFor="product-image"
-								className="mt-1.5 flex cursor-pointer items-center gap-4 rounded-lg border border-dashed border-line p-4 hover:border-brand/50 hover:bg-canvas/50"
-							>
-								{preview ? (
-									<img src={preview} alt="Selected product preview" className="size-16 rounded-md object-cover" />
+							<div className="mt-1.5 flex items-center gap-4 rounded-lg border border-dashed border-line p-4">
+								{shownImage ? (
+									<img src={shownImage} alt="Product image preview" className="size-16 rounded-md object-cover" />
 								) : (
 									<span className="grid size-16 place-items-center rounded-md bg-canvas text-ink-soft" aria-hidden="true">
 										<ImagePlus className="size-6" strokeWidth={1.5} />
 									</span>
 								)}
-								<span className="font-normal">
-									<span className="block font-semibold text-brand">{preview ? 'Change image' : 'Upload an image'}</span>
+								<div className="font-normal">
+									<label htmlFor="product-image" className="cursor-pointer font-semibold text-brand hover:underline">
+										{shownImage ? 'Change image' : 'Upload an image'}
+									</label>
+									{shownImage && (
+										<button
+											type="button"
+											onClick={removeImage}
+											className="ml-3 text-sm font-semibold text-ink-soft hover:text-red-700"
+										>
+											Remove
+										</button>
+									)}
 									<span className="block text-xs text-ink-soft">PNG, JPEG, or WebP up to 2 MB</span>
-								</span>
-							</label>
+								</div>
+							</div>
 							<input
+								ref={fileInput}
 								id="product-image"
 								name="image"
 								type="file"
@@ -323,11 +418,89 @@ function AddProductDrawer({ onClose, onAdded }: { onClose: () => void; onAdded: 
 							Cancel
 						</button>
 						<button type="submit" disabled={saving} className={primaryButton}>
-							{saving ? 'Saving…' : 'Save product'}
+							{saving ? 'Saving…' : product ? 'Save changes' : 'Save product'}
 						</button>
 					</div>
 				</form>
 			</div>
 		</div>
 	);
+}
+
+function DeleteDialog({
+	product,
+	onClose,
+	onDeleted,
+}: {
+	product: Product;
+	onClose: () => void;
+	onDeleted: (product: Product) => void;
+}) {
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const cancel = useRef<HTMLButtonElement>(null);
+	useModal(onClose);
+	useEffect(() => cancel.current?.focus(), []);
+
+	async function confirm() {
+		setBusy(true);
+		setError(null);
+		try {
+			await apiFetch(`/api/vendor/products/${encodeURIComponent(product.id)}`, { method: 'DELETE' });
+			onDeleted(product);
+		} catch (e) {
+			setError((e as Error).message);
+			setBusy(false);
+		}
+	}
+
+	return (
+		<div className="fixed inset-0 z-50 grid place-items-center p-4">
+			<Backdrop onClose={onClose} />
+			<div
+				role="alertdialog"
+				aria-modal="true"
+				aria-labelledby="delete-title"
+				aria-describedby="delete-text"
+				className="relative w-full max-w-md rounded-xl bg-surface p-6 shadow-2xl"
+			>
+				<div className="flex gap-4">
+					<span className="grid size-10 shrink-0 place-items-center rounded-full bg-red-50 text-red-700" aria-hidden="true">
+						<Trash2 className="size-5" />
+					</span>
+					<div className="min-w-0">
+						<h2 id="delete-title" className="m-0 text-base font-semibold">
+							Delete this product?
+						</h2>
+						<p id="delete-text" className="m-0 mt-1 text-sm text-ink-soft">
+							<Strong>{product.title}</Strong> will be removed from your shop. Past order intents and commission stay
+							on record.
+						</p>
+					</div>
+				</div>
+				{error && (
+					<div className="mt-4">
+						<ErrorNote message={error} />
+					</div>
+				)}
+				<div className="mt-6 flex justify-end gap-3">
+					<button ref={cancel} type="button" onClick={onClose} className={secondaryButton}>
+						Cancel
+					</button>
+					<button
+						type="button"
+						onClick={confirm}
+						disabled={busy}
+						className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-red-700 disabled:opacity-60"
+					>
+						{busy ? 'Deleting…' : 'Delete product'}
+					</button>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function Strong({ children }: { children: ReactNode }) {
+	return <span className="font-semibold text-ink">{children}</span>;
 }

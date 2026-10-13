@@ -15,6 +15,7 @@ export interface Product {
 	priceMinor: number;
 	imageUrl: string | null;
 	createdAt: string;
+	updatedAt: string;
 	vendor: VendorRef;
 }
 

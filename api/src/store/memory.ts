@@ -19,11 +19,18 @@ export interface NewProduct {
 	imageUrl: string | null;
 }
 
+export type ProductChanges = Partial<Omit<NewProduct, 'vendorId'>>;
+
 export interface ProductFilter {
 	vendorId?: string;
 	category?: CategorySlug;
 	/** Case-insensitive match on title, description, or shop name. */
 	q?: string;
+}
+
+interface StoredProduct extends Product {
+	/** Soft delete: order intents keep pointing at the product, so it is never removed. */
+	deletedAt: string | null;
 }
 
 /**
@@ -32,7 +39,7 @@ export interface ProductFilter {
  */
 export class MemoryStore {
 	readonly #vendors = new Map<string, Vendor>();
-	readonly #products = new Map<string, Product>();
+	readonly #products = new Map<string, StoredProduct>();
 	readonly #orderIntents: OrderIntent[] = [];
 
 	addVendor(input: Pick<Vendor, 'name' | 'phone'> & { id?: string; commissionBps?: number }): Vendor {
@@ -56,7 +63,8 @@ export class MemoryStore {
 	}
 
 	addProduct(input: NewProduct & { id?: string }): Product {
-		const product: Product = {
+		const now = new Date().toISOString();
+		const product: StoredProduct = {
 			id: input.id ?? randomUUID(),
 			vendorId: input.vendorId,
 			title: input.title,
@@ -64,20 +72,39 @@ export class MemoryStore {
 			category: input.category,
 			priceMinor: input.priceMinor,
 			imageUrl: input.imageUrl,
-			createdAt: new Date().toISOString(),
+			createdAt: now,
+			updatedAt: now,
+			deletedAt: null,
 		};
 		this.#products.set(product.id, product);
-		return product;
+		return this.#public(product);
 	}
 
-	getProduct(id: string): ProductWithVendor | undefined {
+	/** Live products only, unless `includeDeleted` (used to label old order intents). */
+	getProduct(id: string, { includeDeleted = false } = {}): ProductWithVendor | undefined {
 		const product = this.#products.get(id);
-		return product ? this.#withVendor(product) : undefined;
+		if (!product || (product.deletedAt && !includeDeleted)) return undefined;
+		return this.#withVendor(product);
+	}
+
+	/** Returns undefined when the product is missing, deleted, or owned by another vendor. */
+	updateProduct(id: string, vendorId: string, changes: ProductChanges): ProductWithVendor | undefined {
+		const product = this.#liveProductOf(id, vendorId);
+		if (!product) return undefined;
+		Object.assign(product, changes, { updatedAt: new Date().toISOString() });
+		return this.#withVendor(product);
+	}
+
+	deleteProduct(id: string, vendorId: string): boolean {
+		const product = this.#liveProductOf(id, vendorId);
+		if (!product) return false;
+		product.deletedAt = new Date().toISOString();
+		return true;
 	}
 
 	listProducts(filter: ProductFilter = {}): ProductWithVendor[] {
 		const q = filter.q?.trim().toLowerCase();
-		return [...this.#products.values()]
+		return this.#liveProducts()
 			.filter((product) => !filter.vendorId || product.vendorId === filter.vendorId)
 			.filter((product) => !filter.category || product.category === filter.category)
 			.map((product) => this.#withVendor(product))
@@ -90,7 +117,7 @@ export class MemoryStore {
 
 	recordOrderIntent(productId: string): OrderIntent | undefined {
 		const product = this.#products.get(productId);
-		if (!product) return undefined;
+		if (!product || product.deletedAt) return undefined;
 		const vendor = this.#vendors.get(product.vendorId);
 		if (!vendor) return undefined;
 
@@ -112,11 +139,12 @@ export class MemoryStore {
 	}
 
 	commissionSummary(): VendorCommissionSummary[] {
+		const live = this.#liveProducts();
 		return this.listVendors().map((vendor) => {
 			const intents = this.#orderIntents.filter((intent) => intent.vendorId === vendor.id);
 			return {
 				vendor,
-				productCount: [...this.#products.values()].filter((p) => p.vendorId === vendor.id).length,
+				productCount: live.filter((p) => p.vendorId === vendor.id).length,
 				orderIntentCount: intents.length,
 				grossMinor: intents.reduce((sum, intent) => sum + intent.priceMinor, 0),
 				commissionOwedMinor: intents.reduce((sum, intent) => sum + intent.commissionMinor, 0),
@@ -124,9 +152,22 @@ export class MemoryStore {
 		});
 	}
 
-	#withVendor(product: Product): ProductWithVendor {
+	#liveProducts(): StoredProduct[] {
+		return [...this.#products.values()].filter((product) => !product.deletedAt);
+	}
+
+	#liveProductOf(id: string, vendorId: string): StoredProduct | undefined {
+		const product = this.#products.get(id);
+		return product && !product.deletedAt && product.vendorId === vendorId ? product : undefined;
+	}
+
+	#public({ deletedAt: _deletedAt, ...product }: StoredProduct): Product {
+		return product;
+	}
+
+	#withVendor(product: StoredProduct): ProductWithVendor {
 		const vendor = this.#vendors.get(product.vendorId);
 		if (!vendor) throw new Error(`Product ${product.id} has unknown vendor ${product.vendorId}`);
-		return { ...product, vendor: { id: vendor.id, name: vendor.name, phone: vendor.phone } };
+		return { ...this.#public(product), vendor: { id: vendor.id, name: vendor.name, phone: vendor.phone } };
 	}
 }

@@ -38,7 +38,7 @@
 | A · Setup | Astro + React + Tailwind, API, টেস্ট, CI | ✅ |
 | B · Storefront + WhatsApp অর্ডার | কমলা banner-সহ হোম, সার্চ, ক্যাটাগরি পেজ, প্রোডাক্ট পেজ, Order Now, Vendor ও Admin ড্যাশবোর্ড | ✅ |
 | C · Data + Auth | Better Auth লগইন, vendor নিজে signup ✅। বাকি: PostgreSQL + Prisma, admin approval | চলছে |
-| D · Vendor tools | প্রোডাক্ট edit/delete, স্টক, একাধিক ছবি, ক্লিক analytics | |
+| D · Vendor tools | প্রোডাক্ট edit/delete ✅। বাকি: স্টক, একাধিক ছবি, ক্লিক analytics | চলছে |
 | E · কমিশন আদায় | মাসিক statement, vendor-এর পেমেন্ট ledger, বকেয়া হলে প্রোডাক্ট লুকানো | |
 | F · Hardening | rate limit (ক্লিক spam), নিরাপত্তা, ব্যাকআপ, লোড টেস্ট | |
 
@@ -107,6 +107,7 @@
 | `POST /api/auth/sign-in/email`, `POST /api/auth/sign-out`, `GET /api/auth/get-session` | Better Auth লগইন (cookie) |
 | `POST /api/vendor/register` | `{ shopName, phone, email, password }` → নতুন দোকান + vendor লগইন |
 | `GET /api/vendor/me`, `GET/POST /api/vendor/products` | vendor লগইন লাগে |
+| `PATCH/DELETE /api/vendor/products/:id` | শুধু নিজের প্রোডাক্ট edit/delete। Delete মানে লুকানো (soft delete), পুরোনো order intent-এ নাম থেকে যায় |
 | `POST /api/uploads` | vendor লগইন লাগে। `{ dataUrl }` (PNG/JPEG/WebP, ≤২ MB) → `{ url }` |
 | `GET /api/admin/summary` | admin লগইন লাগে |
 

@@ -37,6 +37,7 @@ export interface Product {
 	priceMinor: number;
 	imageUrl: string | null;
 	createdAt: string;
+	updatedAt: string;
 }
 
 export interface ProductWithVendor extends Product {

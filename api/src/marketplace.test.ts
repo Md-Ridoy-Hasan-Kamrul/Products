@@ -237,6 +237,67 @@ describe('vendor products', () => {
 		expect(mine.products.every((p: { vendorId: string }) => p.vendorId === 'vendor-gadget-haat')).toBe(true);
 	});
 
+	test('edits own product; other vendors and empty or unknown fields are rejected', async () => {
+		const created = await post(
+			'/api/vendor/products',
+			{ title: 'Phone Case', category: 'electronics', priceMinor: 30_000 },
+			vendorCookie,
+		);
+		const { product } = await created.json();
+		const patch = (body: unknown, cookie = vendorCookie) =>
+			api(`/api/vendor/products/${product.id}`, { method: 'PATCH', body: JSON.stringify(body), headers: { cookie } });
+
+		const res = await patch({ title: 'Phone Case Pro', priceMinor: 35_000 });
+		expect(res.status).toBe(200);
+		expect((await res.json()).product).toMatchObject({ title: 'Phone Case Pro', priceMinor: 35_000, category: 'electronics' });
+		expect((await (await api(`/api/products/${product.id}`)).json()).product.title).toBe('Phone Case Pro');
+
+		expect((await patch({})).status).toBe(400);
+		expect((await patch({ vendorId: 'vendor-deshi-style' })).status).toBe(400);
+		const otherVendor = await login({ email: 'deshi@ypyd.local', password: DEMO_VENDOR_PASSWORD });
+		expect((await patch({ title: 'Hijacked' }, otherVendor)).status).toBe(404);
+	});
+
+	test('price edits never rewrite recorded order intents', async () => {
+		const id = 'power-bank-20000';
+		await post('/api/orders/click', { productId: id });
+		const before = (await (await api('/api/admin/summary', { headers: { cookie: adminCookie } })).json()).recentOrderIntents[0];
+
+		await api(`/api/vendor/products/${id}`, {
+			method: 'PATCH',
+			body: JSON.stringify({ priceMinor: 1 }),
+			headers: { cookie: vendorCookie },
+		});
+		const after = (await (await api('/api/admin/summary', { headers: { cookie: adminCookie } })).json()).recentOrderIntents[0];
+		expect(after).toEqual(before);
+	});
+
+	test('deletes own product: gone from the shop and orders, still named in the ledger', async () => {
+		const created = await post(
+			'/api/vendor/products',
+			{ title: 'Old Charger', category: 'electronics', priceMinor: 50_000 },
+			vendorCookie,
+		);
+		const { product } = await created.json();
+		await post('/api/orders/click', { productId: product.id });
+		const del = (cookie: string) => api(`/api/vendor/products/${product.id}`, { method: 'DELETE', headers: { cookie } });
+
+		const otherVendor = await login({ email: 'deshi@ypyd.local', password: DEMO_VENDOR_PASSWORD });
+		expect((await del(otherVendor)).status).toBe(404);
+		expect((await del(vendorCookie)).status).toBe(204);
+		expect((await del(vendorCookie)).status).toBe(404);
+
+		expect((await api(`/api/products/${product.id}`)).status).toBe(404);
+		const mine = await (await api('/api/vendor/products', { headers: { cookie: vendorCookie } })).json();
+		expect(mine.products.map((p: { id: string }) => p.id)).not.toContain(product.id);
+		expect((await post('/api/orders/click', { productId: product.id })).status).toBe(404);
+
+		const summary = await (await api('/api/admin/summary', { headers: { cookie: adminCookie } })).json();
+		expect(summary.recentOrderIntents.find((i: { productId: string }) => i.productId === product.id).productTitle).toBe(
+			'Old Charger',
+		);
+	});
+
 	test('rejects an unknown category and a non-integer price', async () => {
 		const res = await post('/api/vendor/products', { title: 'X item', category: 'comics', priceMinor: 1.5 }, vendorCookie);
 		expect(res.status).toBe(400);
