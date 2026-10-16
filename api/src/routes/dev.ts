@@ -5,6 +5,7 @@ import { createCredentialUser, type Auth } from '../auth.js';
 import type { Env } from '../env.js';
 import type { MemoryStore } from '../store/memory.js';
 import { DEMO_VENDOR_LOGINS, DEMO_VENDOR_PASSWORD } from '../store/seed.js';
+import { initialVendorStatus } from './vendor.js';
 
 const QuickLoginBody = z.object({ role: z.enum(['admin', 'vendor']) });
 
@@ -33,6 +34,7 @@ export function devRouter(auth: Auth, store: MemoryStore, env: Env) {
 		const vendor = store.addVendor({
 			name: `Demo Shop ${number}`,
 			phone: `8801700${String(number).padStart(6, '0')}`,
+			status: initialVendorStatus(env),
 		});
 		const login = { email: `shop-${randomUUID().slice(0, 8)}@ypyd.local`, password: DEMO_VENDOR_PASSWORD };
 		await createCredentialUser(auth, { ...login, name: vendor.name, role: 'vendor', vendorId: vendor.id });

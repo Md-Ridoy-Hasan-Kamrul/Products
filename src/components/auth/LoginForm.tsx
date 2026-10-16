@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { dashboardPath, quickLogin, signIn, signOut, type Role, type SessionUser } from '../../lib/auth';
-import { ErrorNote, field, primaryButton, secondaryButton, useRedirectIfLoggedIn } from '../dashboards/ui';
+import { useRedirectIfLoggedIn } from '../dashboards/hooks/useSession';
+import { ErrorNote, field, primaryButton, secondaryButton } from '../dashboards/ui';
 
 interface Props {
 	role: Role;

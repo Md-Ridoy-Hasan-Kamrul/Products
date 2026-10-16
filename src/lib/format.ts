@@ -1,3 +1,5 @@
+import { BPS_PER_PERCENT, POISHA_PER_TAKA } from './constants';
+
 const bdt = new Intl.NumberFormat('en-BD', {
 	style: 'currency',
 	currency: 'BDT',
@@ -6,7 +8,7 @@ const bdt = new Intl.NumberFormat('en-BD', {
 });
 
 export function formatBdt(minor: number): string {
-	return bdt.format(minor / 100);
+	return bdt.format(minor / POISHA_PER_TAKA);
 }
 
 export function groupByCategory<T extends { category: string }>(items: T[]): [string, T[]][] {
@@ -35,7 +37,7 @@ export function formatDay(ymd: string): string {
 }
 
 export function formatPercent(bps: number): string {
-	return `${bps / 100}%`;
+	return `${bps / BPS_PER_PERCENT}%`;
 }
 
 /** Spreadsheet-safe CSV: quotes every cell and defuses leading =, +, -, @. */

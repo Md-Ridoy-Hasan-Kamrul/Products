@@ -33,6 +33,7 @@ export default defineConfig({
 				ADMIN_EMAIL: E2E_ADMIN.email,
 				ADMIN_PASSWORD: E2E_ADMIN.password,
 				IMAGE_PROVIDER: 'mock',
+				VENDOR_APPROVAL: 'manual',
 			},
 		},
 		{

@@ -1,27 +1,20 @@
 ---
-import type { GetStaticPaths } from 'astro';
+import NotFound from '../../components/layout/NotFound.astro';
 import ProductGrid from '../../components/products/ProductGrid.astro';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { loadCatalog } from '../../lib/api';
-import { CATEGORIES, type Category } from '../../lib/categories';
-import type { Product } from '../../lib/types';
+import { CATEGORIES } from '../../lib/categories';
 
-export const getStaticPaths = (async () => {
-	const { products } = await loadCatalog();
-	return CATEGORIES.map((category) => ({
-		params: { slug: category.slug },
-		props: { category, products: products.filter((product) => product.category === category.slug) },
-	}));
-}) satisfies GetStaticPaths;
+// Rendered per request so new products show up at once.
+export const prerender = false;
 
-interface Props {
-	category: Category;
-	products: Product[];
-}
-
-const { category, products } = Astro.props;
-const Icon = category.icon;
+const category = CATEGORIES.find((c) => c.slug === Astro.params.slug);
+if (!category) Astro.response.status = 404;
+const { products } = category ? await loadCatalog({ category: category.slug }) : { products: [] };
+const Icon = category?.icon;
 ---
+
+{!category || !Icon ? <NotFound /> : (
 
 <BaseLayout title={`${category.name} — Your Products Your Dreams`} description={`Shop ${category.name} from local sellers.`}>
 	<div class="container-page pt-6">
@@ -49,3 +42,4 @@ const Icon = category.icon;
 		</div>
 	</div>
 </BaseLayout>
+)}

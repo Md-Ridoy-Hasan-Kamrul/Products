@@ -9,6 +9,7 @@ import {
 	type ProductWithVendor,
 	type Vendor,
 	type VendorCommissionSummary,
+	type VendorStatus,
 } from './types.js';
 
 export interface NewProduct {
@@ -22,8 +23,12 @@ export interface NewProduct {
 
 export type ProductChanges = Partial<Omit<NewProduct, 'vendorId'>>;
 
+export type VendorChanges = Partial<Pick<Vendor, 'name' | 'phone' | 'commissionBps' | 'status'>>;
+
 export interface ProductFilter {
 	vendorId?: string;
+	/** Include products of pending or suspended shops (vendor and admin views). */
+	includeHidden?: boolean;
 	category?: CategorySlug;
 	/** Case-insensitive match on title, description, or shop name. */
 	q?: string;
@@ -45,12 +50,15 @@ export class MemoryStore {
 	/** Same rows as #orderIntents, indexed by vendor so per-vendor reads skip the full ledger. */
 	readonly #intentsByVendor = new Map<string, OrderIntent[]>();
 
-	addVendor(input: Pick<Vendor, 'name' | 'phone'> & { id?: string; commissionBps?: number }): Vendor {
+	addVendor(
+		input: Pick<Vendor, 'name' | 'phone'> & { id?: string; commissionBps?: number; status?: VendorStatus },
+	): Vendor {
 		const vendor: Vendor = {
 			id: input.id ?? randomUUID(),
 			name: input.name,
 			phone: input.phone,
 			commissionBps: input.commissionBps ?? STANDARD_COMMISSION_BPS,
+			status: input.status ?? 'active',
 			createdAt: new Date().toISOString(),
 		};
 		this.#vendors.set(vendor.id, vendor);
@@ -63,6 +71,14 @@ export class MemoryStore {
 
 	listVendors(): Vendor[] {
 		return [...this.#vendors.values()];
+	}
+
+	/** A new rate applies to future order intents only; past intents keep their snapshot. */
+	updateVendor(id: string, changes: VendorChanges): Vendor | undefined {
+		const vendor = this.#vendors.get(id);
+		if (!vendor) return undefined;
+		Object.assign(vendor, changes);
+		return vendor;
 	}
 
 	addProduct(input: NewProduct & { id?: string }): Product {
@@ -83,11 +99,17 @@ export class MemoryStore {
 		return this.#public(product);
 	}
 
-	/** Live products only, unless `includeDeleted` (used to label old order intents). */
-	getProduct(id: string, { includeDeleted = false } = {}): ProductWithVendor | undefined {
+	/** What buyers can see: not deleted, and the shop is active. */
+	getProduct(id: string): ProductWithVendor | undefined {
 		const product = this.#products.get(id);
-		if (!product || (product.deletedAt && !includeDeleted)) return undefined;
+		if (!product || product.deletedAt || !this.#isPublic(product)) return undefined;
 		return this.#withVendor(product);
+	}
+
+	/** A vendor's own live product, whatever the shop status. */
+	getVendorProduct(id: string, vendorId: string): ProductWithVendor | undefined {
+		const product = this.#liveProductOf(id, vendorId);
+		return product && this.#withVendor(product);
 	}
 
 	/** Returns undefined when the product is missing, deleted, or owned by another vendor. */
@@ -108,6 +130,7 @@ export class MemoryStore {
 	listProducts(filter: ProductFilter = {}): ProductWithVendor[] {
 		const q = filter.q?.trim().toLowerCase();
 		return this.#liveProducts()
+			.filter((product) => filter.includeHidden || this.#isPublic(product))
 			.filter((product) => !filter.vendorId || product.vendorId === filter.vendorId)
 			.filter((product) => !filter.category || product.category === filter.category)
 			.map((product) => this.#withVendor(product))
@@ -120,9 +143,8 @@ export class MemoryStore {
 
 	recordOrderIntent(productId: string): OrderIntent | undefined {
 		const product = this.#products.get(productId);
-		if (!product || product.deletedAt) return undefined;
-		const vendor = this.#vendors.get(product.vendorId);
-		if (!vendor) return undefined;
+		if (!product || product.deletedAt || !this.#isPublic(product)) return undefined;
+		const vendor = this.#vendors.get(product.vendorId)!;
 
 		const intent: OrderIntent = Object.freeze({
 			id: randomUUID(),
@@ -167,6 +189,10 @@ export class MemoryStore {
 		});
 	}
 
+	#isPublic(product: StoredProduct): boolean {
+		return this.#vendors.get(product.vendorId)?.status === 'active';
+	}
+
 	#liveProducts(): StoredProduct[] {
 		return [...this.#products.values()].filter((product) => !product.deletedAt);
 	}
@@ -183,6 +209,9 @@ export class MemoryStore {
 	#withVendor(product: StoredProduct): ProductWithVendor {
 		const vendor = this.#vendors.get(product.vendorId);
 		if (!vendor) throw new Error(`Product ${product.id} has unknown vendor ${product.vendorId}`);
-		return { ...this.#public(product), vendor: { id: vendor.id, name: vendor.name, phone: vendor.phone } };
+		return {
+			...this.#public(product),
+			vendor: { id: vendor.id, name: vendor.name, phone: vendor.phone, status: vendor.status },
+		};
 	}
 }

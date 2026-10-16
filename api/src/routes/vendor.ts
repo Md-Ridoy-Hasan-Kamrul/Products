@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { createCredentialUser, EmailTakenError, requireVendor, type Auth } from '../auth.js';
+import type { Env } from '../env.js';
 import type { MemoryStore } from '../store/memory.js';
 import { dailySeries, productStats, totalsOf } from '../store/stats.js';
 import { CATEGORY_SLUGS } from '../store/types.js';
+import { BdPhone, ShopName } from '../validation.js';
 import { CHART_DAYS, recentIntents } from './insights.js';
 
 const NewProductBody = z.object({
@@ -28,20 +30,25 @@ const ProductChangesBody = z
 
 const ProductParams = z.object({ id: z.string().min(1).max(100) });
 
-/** Accepts 01XXXXXXXXX, 8801XXXXXXXXX, or +880 1XXX-XXXXXX and returns 8801XXXXXXXXX. */
-const BdPhone = z
-	.string()
-	.transform((value) => value.replace(/\D/g, '').replace(/^0(?=1)/, '880'))
-	.pipe(z.string().regex(/^8801[3-9]\d{8}$/, 'Enter a Bangladeshi mobile number, e.g. 01711000000'));
-
 const RegisterBody = z.object({
-	shopName: z.string().trim().min(2).max(100),
+	shopName: ShopName,
 	phone: BdPhone,
 	email: z.email().max(200),
 	password: z.string().min(8).max(128),
 });
 
-export function vendorRouter(store: MemoryStore, auth: Auth) {
+const ShopChangesBody = z
+	.object({ name: ShopName, phone: BdPhone })
+	.partial()
+	.strict()
+	.refine((changes) => Object.keys(changes).length > 0, 'Nothing to update');
+
+/** Status a new shop starts in. */
+export function initialVendorStatus(env: Env) {
+	return env.VENDOR_APPROVAL === 'manual' ? 'pending' : 'active';
+}
+
+export function vendorRouter(store: MemoryStore, auth: Auth, env: Env) {
 	const router = Router();
 
 	router.post('/register', async (req, res) => {
@@ -52,7 +59,7 @@ export function vendorRouter(store: MemoryStore, auth: Auth) {
 			return;
 		}
 
-		const vendor = store.addVendor({ name: body.shopName, phone: body.phone });
+		const vendor = store.addVendor({ name: body.shopName, phone: body.phone, status: initialVendorStatus(env) });
 		try {
 			await createCredentialUser(auth, {
 				email: body.email,
@@ -77,6 +84,11 @@ export function vendorRouter(store: MemoryStore, auth: Auth) {
 		res.json({ vendor: res.locals.vendor });
 	});
 
+	// Name and WhatsApp number only; status and rate belong to the admin.
+	router.patch('/me', (req, res) => {
+		res.json({ vendor: store.updateVendor(res.locals.vendor!.id, ShopChangesBody.parse(req.body)) });
+	});
+
 	router.get('/insights', (_req, res) => {
 		const intents = store.listOrderIntents({ vendorId: res.locals.vendor!.id });
 		res.json({
@@ -88,13 +100,13 @@ export function vendorRouter(store: MemoryStore, auth: Auth) {
 	});
 
 	router.get('/products', (_req, res) => {
-		res.json({ products: store.listProducts({ vendorId: res.locals.vendor!.id }) });
+		res.json({ products: store.listProducts({ vendorId: res.locals.vendor!.id, includeHidden: true }) });
 	});
 
 	router.post('/products', (req, res) => {
 		const body = NewProductBody.parse(req.body);
 		const product = store.addProduct({ ...body, vendorId: res.locals.vendor!.id });
-		res.status(201).json({ product: store.getProduct(product.id) });
+		res.status(201).json({ product: store.getVendorProduct(product.id, res.locals.vendor!.id) });
 	});
 
 	router.patch('/products/:id', (req, res) => {

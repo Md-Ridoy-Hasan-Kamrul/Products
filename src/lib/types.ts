@@ -1,7 +1,11 @@
+/** See VENDOR_STATUSES in api/src/store/types.ts. Only active shops are public. */
+export type VendorStatus = 'pending' | 'active' | 'suspended';
+
 export interface VendorRef {
 	id: string;
 	name: string;
 	phone: string;
+	status: VendorStatus;
 }
 
 export interface Product {
@@ -74,9 +78,14 @@ export interface VendorInsights {
 }
 
 export interface AdminSummary {
-	totals: IntentTotals & { vendors: number; products: number };
+	totals: IntentTotals & { vendors: number; pendingVendors: number; products: number };
 	vendors: VendorCommissionSummary[];
 	daily: DailyPoint[];
 	productStats: ProductIntentStat[];
 	recentOrderIntents: OrderIntentRow[];
+}
+
+/** GET /api/admin/products */
+export interface AdminProduct extends Product {
+	vendorStatus: VendorStatus;
 }

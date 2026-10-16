@@ -6,6 +6,9 @@ import TrustStrip from '../components/home/TrustStrip.astro';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { loadCatalog } from '../lib/api';
 
+// Rendered per request so new products show up at once.
+export const prerender = false;
+
 const { products, error } = await loadCatalog();
 ---
 

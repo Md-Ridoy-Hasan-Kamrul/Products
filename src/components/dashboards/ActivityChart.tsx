@@ -5,16 +5,26 @@ import { td, th } from './ui';
 
 type Metric = 'orderIntents' | 'commissionMinor';
 
+const FULL_HEIGHT_PERCENT = 100;
+/** A non-zero day stays visible even when tiny next to the busiest day. */
+const MIN_BAR_PX = 3;
+/** Bars at each edge whose tooltip aligns inward so it is not clipped. */
+const EDGE_BARS = 2;
+
 const METRICS: { id: Metric; label: string; format: (value: number) => string }[] = [
 	{ id: 'orderIntents', label: 'Order intents', format: (value) => String(value) },
 	{ id: 'commissionMinor', label: 'Commission', format: formatBdt },
 ];
 
-/** Round the axis top up to an even step, so the midline is a whole count. */
+/** Even axis tops per power of ten, so the midline is always a whole count. */
+const AXIS_STEPS = [2, 4, 6, 8, 10];
+const SMALLEST_AXIS_TOP = AXIS_STEPS[0]!;
+const LARGEST_STEP = AXIS_STEPS.at(-1)!;
+
 function niceMax(value: number): number {
-	if (value <= 2) return 2;
+	if (value <= SMALLEST_AXIS_TOP) return SMALLEST_AXIS_TOP;
 	const power = 10 ** Math.floor(Math.log10(value));
-	return ([2, 4, 6, 8, 10].find((step) => step * power >= value) ?? 10) * power;
+	return (AXIS_STEPS.find((step) => step * power >= value) ?? LARGEST_STEP) * power;
 }
 
 /**
@@ -64,12 +74,12 @@ export default function ActivityChart({ daily }: { daily: DailyPoint[] }) {
 					<div className="absolute inset-0 flex items-end gap-0.5 min-[640px]:gap-1.5">
 						{daily.map((point, index) => {
 							const value = point[metricId];
-							const edge = index < 2 ? 'left-0' : index > daily.length - 3 ? 'right-0' : 'left-1/2 -translate-x-1/2';
+							const edge = index < EDGE_BARS ? 'left-0' : index >= daily.length - EDGE_BARS ? 'right-0' : 'left-1/2 -translate-x-1/2';
 							return (
 								<div key={point.date} className="group relative flex h-full flex-1 items-end justify-center">
 									<div
 										className="w-full max-w-8 rounded-t bg-brand transition-colors group-hover:bg-brand-deep"
-										style={{ height: value > 0 ? `max(${(value / max) * 100}%, 3px)` : 0 }}
+										style={{ height: value > 0 ? `max(${(value / max) * FULL_HEIGHT_PERCENT}%, ${MIN_BAR_PX}px)` : 0 }}
 									/>
 									<div
 										className={`pointer-events-none absolute bottom-full z-10 mb-2 hidden rounded-lg border border-line bg-surface px-3 py-2 whitespace-nowrap shadow-lg group-hover:block ${edge}`}

@@ -1,33 +1,25 @@
 ---
-import type { GetStaticPaths } from 'astro';
 import { Store } from 'lucide-react';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import OrderNowButton from '../../components/products/OrderNowButton';
 import ProductGrid from '../../components/products/ProductGrid.astro';
 import ProductImage from '../../components/products/ProductImage';
-import { loadCatalog } from '../../lib/api';
+import NotFound from '../../components/layout/NotFound.astro';
+import { loadCatalog, loadProduct } from '../../lib/api';
 import { categoryBySlug, categoryPath } from '../../lib/categories';
 import { formatBdt } from '../../lib/format';
-import type { Product } from '../../lib/types';
 
-export const getStaticPaths = (async () => {
-	const { products } = await loadCatalog();
-	return products.map((product) => ({
-		params: { id: product.id },
-		props: {
-			product,
-			related: products.filter((other) => other.category === product.category && other.id !== product.id).slice(0, 5),
-		},
-	}));
-}) satisfies GetStaticPaths;
+// Rendered per request so new and edited products are live at once.
+export const prerender = false;
 
-interface Props {
-	product: Product;
-	related: Product[];
-}
+const RELATED_LIMIT = 5;
 
-const { product, related } = Astro.props;
-const category = categoryBySlug(product.category);
+const product = await loadProduct(Astro.params.id ?? '');
+if (!product) Astro.response.status = 404;
+const related = product
+	? (await loadCatalog({ category: product.category })).products.filter((other) => other.id !== product.id).slice(0, RELATED_LIMIT)
+	: [];
+const category = categoryBySlug(product?.category ?? '');
 const steps = [
 	'Tap Order Now. WhatsApp opens with this product already in the message.',
 	'Agree on size, colour, delivery, and price with the seller.',
@@ -35,6 +27,7 @@ const steps = [
 ];
 ---
 
+{!product ? <NotFound /> : (
 <BaseLayout title={`${product.title} — Your Products Your Dreams`} description={product.description || product.title}>
 	<div class="container-page pt-6">
 		<nav aria-label="Breadcrumb" class="text-sm text-ink-soft">
@@ -106,3 +99,4 @@ const steps = [
 		}
 	</div>
 </BaseLayout>
+)}

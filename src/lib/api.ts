@@ -28,17 +28,28 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 }
 
 /**
- * Build-time catalog fetch. Returns an empty list when the API is down so a
- * static build still succeeds; the page shows an empty state instead.
+ * Server-side catalog fetch for storefront pages. Returns an empty list when
+ * the API is down so the page shows an empty state instead of crashing.
  */
-export async function loadCatalog(): Promise<{ products: Product[]; error: string | null }> {
+export async function loadCatalog(filter: { category?: string } = {}): Promise<{ products: Product[]; error: string | null }> {
+	const query = filter.category ? `?category=${encodeURIComponent(filter.category)}` : '';
 	try {
-		const { products } = await apiFetch<{ products: Product[] }>('/api/products');
+		const { products } = await apiFetch<{ products: Product[] }>(`/api/products${query}`);
 		return { products, error: null };
 	} catch (error) {
 		const message = (error as Error).message;
 		console.warn(`[catalog] ${message}`);
 		return { products: [], error: message };
+	}
+}
+
+/** One public product, or null when it does not exist or its shop is not live. */
+export async function loadProduct(id: string): Promise<Product | null> {
+	try {
+		return (await apiFetch<{ product: Product }>(`/api/products/${encodeURIComponent(id)}`)).product;
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 404) return null;
+		throw error;
 	}
 }
 

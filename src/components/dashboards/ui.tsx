@@ -1,8 +1,10 @@
 import {
+	AlertTriangle,
 	ArrowDown,
 	ArrowUp,
 	ArrowUpDown,
 	CheckCircle2,
+	Clock,
 	ExternalLink,
 	Loader2,
 	LogOut,
@@ -10,9 +12,10 @@ import {
 	X,
 	type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { apiFetch } from '../../lib/api';
-import { dashboardPath, getSession, loginPath, signOut, type Role, type SessionUser } from '../../lib/auth';
+import { useState, type ReactNode } from 'react';
+import { loginPath, signOut, type Role, type SessionUser } from '../../lib/auth';
+import type { SessionState } from './hooks/useSession';
+import type { SortState } from './hooks/useSort';
 
 export const field =
 	'mt-1.5 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm shadow-xs outline-none placeholder:text-ink-soft/60 focus:border-brand focus:ring-3 focus:ring-brand/15';
@@ -23,43 +26,12 @@ export const secondaryButton =
 export const iconButton = 'rounded-lg p-2 text-ink-soft hover:bg-canvas hover:text-ink';
 export const th = 'border-b border-line bg-canvas/60 px-4 py-2.5 text-left text-xs font-semibold tracking-wide text-ink-soft uppercase whitespace-nowrap';
 export const td = 'border-b border-line px-4 py-3 align-middle whitespace-nowrap';
-export const table = 'w-full border-collapse text-sm';
+/** `relative` keeps sr-only header labels inside the table's scroll area instead of widening the page. */
+export const table = 'relative w-full border-collapse text-sm';
 export const tbody = '[&>tr:last-child>td]:border-b-0';
 export const row = 'hover:bg-canvas/50';
 
 /* ---------- Session ---------- */
-
-type SessionState =
-	| { status: 'loading' }
-	| { status: 'ready'; user: SessionUser }
-	| { status: 'error'; message: string };
-
-/** Loads the session and sends the visitor to the login page unless they have `role`. */
-export function useRequiredSession(role: Role): SessionState {
-	const [state, setState] = useState<SessionState>({ status: 'loading' });
-
-	useEffect(() => {
-		getSession()
-			.then((user) => {
-				if (user?.role === role) setState({ status: 'ready', user });
-				else window.location.replace(loginPath(role));
-			})
-			.catch((error: Error) => setState({ status: 'error', message: error.message }));
-	}, [role]);
-
-	return state;
-}
-
-/** On a login page: skip the form if the visitor is already logged in with `role`. */
-export function useRedirectIfLoggedIn(role: Role) {
-	useEffect(() => {
-		getSession()
-			.then((user) => {
-				if (user?.role === role) window.location.replace(dashboardPath(role));
-			})
-			.catch(() => {});
-	}, [role]);
-}
 
 export function SessionGate({ state, children }: { state: SessionState; children: (user: SessionUser) => ReactNode }) {
 	if (state.status === 'ready') return <>{children(state.user)}</>;
@@ -78,97 +50,6 @@ export function SessionGate({ state, children }: { state: SessionState; children
 	);
 }
 
-/* ---------- Data ---------- */
-
-export interface ApiState<T> {
-	data: T | null;
-	error: string | null;
-	/** True while a request is in flight; `data` keeps the previous result meanwhile. */
-	loading: boolean;
-	reload: () => void;
-}
-
-export function useApi<T>(path: string): ApiState<T> {
-	const [data, setData] = useState<T | null>(null);
-	const [error, setError] = useState<string | null>(null);
-	const [loading, setLoading] = useState(true);
-	const [version, setVersion] = useState(0);
-
-	useEffect(() => {
-		let current = true;
-		setLoading(true);
-		apiFetch<T>(path)
-			.then((result) => {
-				if (!current) return;
-				setData(result);
-				setError(null);
-			})
-			.catch((e: Error) => current && setError(e.message))
-			.finally(() => current && setLoading(false));
-		return () => {
-			current = false;
-		};
-	}, [path, version]);
-
-	const reload = useCallback(() => setVersion((v) => v + 1), []);
-	return { data, error, loading, reload };
-}
-
-/** The dashboard section named by the URL hash, e.g. `#products`. Falls back to the first id. */
-export function useSection<Id extends string>(ids: readonly Id[]): [Id, (id: Id) => void] {
-	const read = useCallback((): Id => {
-		const hash = window.location.hash.slice(1) as Id;
-		return ids.includes(hash) ? hash : ids[0]!;
-	}, [ids]);
-	const [section, setSection] = useState<Id>(read);
-
-	useEffect(() => {
-		const onHash = () => {
-			setSection(read());
-			window.scrollTo({ top: 0 });
-		};
-		window.addEventListener('hashchange', onHash);
-		return () => window.removeEventListener('hashchange', onHash);
-	}, [read]);
-
-	const go = useCallback((id: Id) => {
-		window.location.hash = id;
-	}, []);
-	return [section, go];
-}
-
-export type SortDir = 'asc' | 'desc';
-export interface SortState<K extends string> {
-	key: K;
-	dir: SortDir;
-}
-
-/** Sorts `rows` by one of `accessors`. Clicking the active column flips direction. */
-export function useSort<T, K extends string>(
-	rows: readonly T[],
-	accessors: Record<K, (row: T) => string | number>,
-	initial: SortState<NoInfer<K>>,
-) {
-	const [sort, setSort] = useState(initial);
-	const sorted = useMemo(() => {
-		const get = accessors[sort.key];
-		const sign = sort.dir === 'asc' ? 1 : -1;
-		return [...rows].sort((a, b) => {
-			const x = get(a);
-			const y = get(b);
-			return sign * (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y)));
-		});
-		// `accessors` is a fresh object literal each render but static per table, so it is left out.
-	}, [rows, sort]);
-	// Numbers start biggest first, text A to Z.
-	const firstDir = (key: K): SortDir => (rows.length > 0 && typeof accessors[key](rows[0]!) === 'number' ? 'desc' : 'asc');
-	const toggle = (key: K) =>
-		setSort((current) =>
-			current.key === key ? { key, dir: current.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: firstDir(key) },
-		);
-	return { sorted, sort, toggle };
-}
-
 /* ---------- Shell ---------- */
 
 export interface NavItem<Id extends string = string> {
@@ -184,7 +65,7 @@ interface ShellProps<Id extends string> {
 	user: SessionUser;
 	nav: NavItem<Id>[];
 	section: Id;
-	/** Shown under the brand, e.g. the shop name. */
+	/** Shown under the brand and in the account card, e.g. the shop name. */
 	workspace: string;
 	title: string;
 	description?: string;
@@ -221,7 +102,8 @@ export function DashboardShell<Id extends string>({
 			className="inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm font-medium text-ink-soft hover:bg-canvas hover:text-ink"
 		>
 			<LogOut className="size-4" aria-hidden="true" />
-			{leaving ? 'Logging out…' : 'Log out'}
+			{/* Icon only on the narrowest phones, so the header fits in 320px. */}
+			<span className="max-[374px]:sr-only">{leaving ? 'Logging out…' : 'Log out'}</span>
 		</button>
 	);
 
@@ -251,9 +133,9 @@ export function DashboardShell<Id extends string>({
 				</nav>
 				<div className="border-t border-line p-3">
 					<div className="flex items-center gap-3 px-2 py-2">
-						<Avatar name={user.name} />
+						<Avatar name={role === 'vendor' ? workspace : user.name} />
 						<div className="min-w-0">
-							<p className="m-0 truncate text-sm font-semibold">{user.name}</p>
+							<p className="m-0 truncate text-sm font-semibold">{role === 'vendor' ? workspace : user.name}</p>
 							<p className="m-0 truncate text-xs text-ink-soft">{user.email}</p>
 						</div>
 					</div>
@@ -428,14 +310,19 @@ export function Stat({
 	);
 }
 
-export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'success' | 'brand' }) {
-	const tones = {
-		neutral: 'bg-canvas text-ink-soft ring-line',
-		success: 'bg-green-50 text-green-700 ring-green-600/20',
-		brand: 'bg-brand-soft text-brand-deep ring-brand/20',
-	};
+export type BadgeTone = 'neutral' | 'success' | 'brand' | 'warning' | 'danger';
+
+const BADGE_TONES: Record<BadgeTone, string> = {
+	neutral: 'bg-canvas text-ink-soft ring-line',
+	success: 'bg-green-50 text-green-700 ring-green-600/20',
+	brand: 'bg-brand-soft text-brand-deep ring-brand/20',
+	warning: 'bg-amber-50 text-amber-800 ring-amber-600/20',
+	danger: 'bg-red-50 text-red-700 ring-red-600/20',
+};
+
+export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: BadgeTone }) {
 	return (
-		<span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset ${tones[tone]}`}>
+		<span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset ${BADGE_TONES[tone]}`}>
 			{children}
 		</span>
 	);
@@ -463,6 +350,21 @@ export function ErrorNote({ message, onRetry }: { message: string; onRetry?: () 
 					Try again
 				</button>
 			)}
+		</div>
+	);
+}
+
+/** A standing message about the account, e.g. a shop in review. */
+export function StatusNote({ tone, title, children }: { tone: 'warning' | 'danger'; title: string; children: ReactNode }) {
+	const tones = { warning: 'border-amber-200 bg-amber-50 text-amber-900', danger: 'border-red-200 bg-red-50 text-red-900' };
+	const Icon = tone === 'warning' ? Clock : AlertTriangle;
+	return (
+		<div role="note" className={`flex gap-3 rounded-xl border px-4 py-3.5 text-sm ${tones[tone]}`}>
+			<Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+			<div>
+				<p className="m-0 font-semibold">{title}</p>
+				<p className="m-0 mt-0.5">{children}</p>
+			</div>
 		</div>
 	);
 }
@@ -586,4 +488,9 @@ export function Detail({ label, children }: { label: string; children: ReactNode
 			<dd className="m-0 font-medium">{children}</dd>
 		</div>
 	);
+}
+
+/** Click-to-close overlay behind a dialog or drawer. */
+export function Backdrop({ onClose }: { onClose: () => void }) {
+	return <button type="button" aria-label="Close" tabIndex={-1} className="absolute inset-0 bg-ink/40" onClick={onClose} />;
 }

@@ -17,6 +17,16 @@ export type CategorySlug = (typeof CATEGORIES)[number]['slug'];
 
 /** Standard commission in basis points (1000 = 10%). */
 export const STANDARD_COMMISSION_BPS = 1000;
+/** 100%: a rate can never exceed the price. */
+export const MAX_COMMISSION_BPS = 10_000;
+
+/**
+ * pending: signed up, waiting for admin approval (VENDOR_APPROVAL=manual).
+ * active: products are public and take orders. suspended: paused by an admin.
+ * In every state the vendor can still log in and manage products.
+ */
+export const VENDOR_STATUSES = ['pending', 'active', 'suspended'] as const;
+export type VendorStatus = (typeof VENDOR_STATUSES)[number];
 
 export interface Vendor {
 	id: string;
@@ -24,6 +34,7 @@ export interface Vendor {
 	/** WhatsApp number in international format without "+", e.g. 8801711000000. */
 	phone: string;
 	commissionBps: number;
+	status: VendorStatus;
 	createdAt: string;
 }
 
@@ -41,7 +52,7 @@ export interface Product {
 }
 
 export interface ProductWithVendor extends Product {
-	vendor: Pick<Vendor, 'id' | 'name' | 'phone'>;
+	vendor: Pick<Vendor, 'id' | 'name' | 'phone' | 'status'>;
 }
 
 /**

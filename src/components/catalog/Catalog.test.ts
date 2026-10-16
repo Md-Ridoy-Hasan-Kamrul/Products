@@ -5,7 +5,7 @@ import { expect, test } from 'vitest';
 import type { Product } from '../../lib/types';
 import Catalog from './Catalog.astro';
 
-const vendor = { id: 'v1', name: 'Gadget Haat', phone: '8801711000001' };
+const vendor = { id: 'v1', name: 'Gadget Haat', phone: '8801711000001', status: 'active' as const };
 
 function product(id: string, title: string, category: string): Product {
 	return {

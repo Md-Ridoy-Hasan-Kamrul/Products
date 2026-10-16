@@ -37,8 +37,8 @@
 | --- | --- | --- |
 | A · Setup | Astro + React + Tailwind, API, টেস্ট, CI | ✅ |
 | B · Storefront + WhatsApp অর্ডার | কমলা banner-সহ হোম, সার্চ, ক্যাটাগরি পেজ, প্রোডাক্ট পেজ, Order Now, Vendor ও Admin ড্যাশবোর্ড | ✅ |
-| C · Data + Auth | Better Auth লগইন, vendor নিজে signup ✅। বাকি: PostgreSQL + Prisma, admin approval | চলছে |
-| D · Vendor tools | প্রোডাক্ট edit/delete ✅। বাকি: স্টক, একাধিক ছবি, ক্লিক analytics | চলছে |
+| C · Data + Auth | Better Auth লগইন, vendor নিজে signup, admin approval (`VENDOR_APPROVAL`) ✅। বাকি: PostgreSQL + Prisma | চলছে |
+| D · Vendor tools | প্রোডাক্ট edit/delete, দোকানের নাম/WhatsApp বদলানো, ক্লিক analytics, লিংক কপি ✅। বাকি: স্টক, একাধিক ছবি | চলছে |
 | E · কমিশন আদায় | মাসিক statement, vendor-এর পেমেন্ট ledger, বকেয়া হলে প্রোডাক্ট লুকানো | |
 | F · Hardening | rate limit (ক্লিক spam), নিরাপত্তা, ব্যাকআপ, লোড টেস্ট | |
 
@@ -108,8 +108,11 @@
 | `POST /api/vendor/register` | `{ shopName, phone, email, password }` → নতুন দোকান + vendor লগইন |
 | `GET /api/vendor/me`, `GET/POST /api/vendor/products` | vendor লগইন লাগে |
 | `GET /api/vendor/insights` | vendor লগইন লাগে। শুধু নিজের intent: মোট, ১৪ দিনের দৈনিক হিসাব, প্রোডাক্ট-প্রতি সংখ্যা, শেষ ১০০টি intent |
+| `PATCH /api/vendor/me` | `{ name?, phone? }` → দোকানের নাম ও WhatsApp নম্বর বদলায়। status আর rate শুধু admin বদলাতে পারে |
 | `PATCH/DELETE /api/vendor/products/:id` | শুধু নিজের প্রোডাক্ট edit/delete। Delete মানে লুকানো (soft delete), পুরোনো order intent-এ নাম থেকে যায় |
 | `POST /api/uploads` | vendor লগইন লাগে। `{ dataUrl }` (PNG/JPEG/WebP, ≤২ MB) → `{ url }` |
+| `PATCH /api/admin/vendors/:id` | admin লগইন লাগে। `{ status?: 'pending' \| 'active' \| 'suspended', commissionBps? }`। নতুন rate শুধু পরের intent-এ |
+| `GET /api/admin/products` | admin লগইন লাগে। সব প্রোডাক্ট, লুকানো দোকানেরগুলোসহ (`vendorStatus`) |
 | `GET /api/admin/summary` | admin লগইন লাগে। মোট, vendor-প্রতি কমিশন, ১৪ দিনের দৈনিক হিসাব, প্রোডাক্ট-প্রতি সংখ্যা, শেষ ১০০টি intent (vendor নামসহ) |
 
 ## লগইন
@@ -125,8 +128,7 @@
 
 এখনকার সীমাবদ্ধতা:
 - ডেটা আর লগইন in-memory, API restart দিলে নতুন প্রোডাক্ট, intent, নতুন vendor অ্যাকাউন্ট আর session মুছে যায় (ধাপ C-তে Prisma)।
-- সাইট স্ট্যাটিক, তাই vendor-এর নতুন প্রোডাক্ট পরের build-এ দেখা যায়। dev-এ সঙ্গে সঙ্গে আসে।
-- নতুন vendor সাথে সাথে বিক্রি শুরু করতে পারে। Admin approval ধাপ C-তে।
+- হোম, ক্যাটাগরি আর প্রোডাক্ট পেজ প্রতি request-এ render হয় (`@astrojs/node`), তাই নতুন প্রোডাক্ট সাথে সাথে live। বাকি পেজ আগে থেকে build করা। Production-এ `npm run build` তারপর `npm start` (Node server, `dist/server/entry.mjs`)।
 
 ## কমান্ড
 
@@ -137,10 +139,13 @@
 | `npm run dev` | Web + API একসাথে চালু, `localhost:4321` ব্রাউজারে খোলে |
 | `npm run dev:web` | শুধু Web |
 | `npm run dev:api` | শুধু API, `localhost:4000/health` |
-| `npm run build` | Web স্ট্যাটিক build, `dist/` |
+| `npm run build` | Web build, `dist/` (client + server) |
+| `npm start` | Production web server চালু (build-এর পরে) |
 | `npm test` | Web Vitest |
 | `npm run test:api` | API Vitest |
 | `npm run test:e2e` | Playwright |
 
-API চালানোর আগে `api/.env.example` কপি করে `api/.env` বানান (না বানালেও ডিফল্টে চলে, উপরের লোকাল অ্যাকাউন্ট দিয়ে)। Web-এর API ঠিকানা বদলাতে রুটের `.env.example` কপি করে `.env` (`PUBLIC_API_URL`)। `npm run build`-এর সময় API চালু থাকতে হবে, না থাকলে build সফল হয় কিন্তু দোকান খালি দেখায়।
+দোকানের অবস্থা: `pending` (approval-এর অপেক্ষায়), `active` (live), `suspended` (admin থামিয়েছে)। শুধু `active` দোকানের প্রোডাক্ট ক্রেতা দেখে ও Order Now কাজ করে। `api/.env`-এ `VENDOR_APPROVAL=auto` (ডিফল্ট, নতুন দোকান সাথে সাথে live) বা `manual` (admin approve করলে live)। Vendor সবসময় লগইন করে প্রোডাক্ট সাজাতে পারে।
+
+API চালানোর আগে `api/.env.example` কপি করে `api/.env` বানান (না বানালেও ডিফল্টে চলে, উপরের লোকাল অ্যাকাউন্ট দিয়ে)। Web-এর API ঠিকানা বদলাতে রুটের `.env.example` কপি করে `.env` (`PUBLIC_API_URL`)। Build-এর সময় API লাগে না; storefront পেজ চালু অবস্থায় API থেকে ডেটা আনে।
 # Products

@@ -2,8 +2,10 @@ import { ImagePlus, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { apiFetch } from '../../lib/api';
 import { CATEGORIES } from '../../lib/categories';
+import { POISHA_PER_TAKA } from '../../lib/constants';
 import type { Product } from '../../lib/types';
-import { ErrorNote, field, iconButton, primaryButton, secondaryButton } from './ui';
+import { useModal } from './hooks/useModal';
+import { Backdrop, ErrorNote, field, iconButton, primaryButton, secondaryButton } from './ui';
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
@@ -15,23 +17,6 @@ function readAsDataUrl(file: File): Promise<string> {
 		reader.onerror = () => reject(reader.error);
 		reader.readAsDataURL(file);
 	});
-}
-
-/** Closes on Escape and locks page scroll while a panel or dialog is open. */
-function useModal(onClose: () => void) {
-	useEffect(() => {
-		const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
-		window.addEventListener('keydown', onKey);
-		document.body.style.overflow = 'hidden';
-		return () => {
-			window.removeEventListener('keydown', onKey);
-			document.body.style.overflow = '';
-		};
-	}, [onClose]);
-}
-
-function Backdrop({ onClose }: { onClose: () => void }) {
-	return <button type="button" aria-label="Close" tabIndex={-1} className="absolute inset-0 bg-ink/40" onClick={onClose} />;
 }
 
 export function ProductDrawer({
@@ -90,7 +75,7 @@ export function ProductDrawer({
 				title: data.get('title'),
 				description: data.get('description'),
 				category: data.get('category'),
-				priceMinor: Math.round(Number(data.get('price')) * 100),
+				priceMinor: Math.round(Number(data.get('price')) * POISHA_PER_TAKA),
 				imageUrl,
 			});
 			const { product: result } = product
@@ -165,7 +150,7 @@ export function ProductDrawer({
 									step="0.01"
 									inputMode="decimal"
 									placeholder="0.00"
-									defaultValue={product ? product.priceMinor / 100 : undefined}
+									defaultValue={product ? product.priceMinor / POISHA_PER_TAKA : undefined}
 									className={field}
 								/>
 							</label>

@@ -40,7 +40,7 @@ export async function createApp(env: Env, deps: AppDeps = {}) {
 	app.use(express.json({ limit: '1mb' }));
 	app.use('/api', catalogRouter(store));
 	app.use('/api/orders', ordersRouter(store));
-	app.use('/api/vendor', vendorRouter(store, auth));
+	app.use('/api/vendor', vendorRouter(store, auth, env));
 	app.use('/api/admin', adminRouter(store, auth));
 	if (env.NODE_ENV !== 'production') app.use('/api/dev', devRouter(auth, store, env));
 

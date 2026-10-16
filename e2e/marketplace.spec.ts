@@ -208,7 +208,7 @@ test('admin login rejects a vendor and shows commission for the admin', async ({
 	await expect(page.getByRole('heading', { level: 1, name: 'Vendors' })).toBeVisible();
 	await page.getByLabel('Search by name or phone').fill('deshi');
 	await expect(page.getByRole('row').filter({ hasText: 'Gadget Haat' })).toHaveCount(0);
-	await page.getByRole('button', { name: 'Deshi Style' }).click();
+	await page.getByRole('button', { name: 'Deshi Style', exact: true }).click();
 	await expect(page).toHaveURL(/#orders$/);
 	await expect(page.getByRole('combobox', { name: 'Vendor', exact: true })).toHaveValue('vendor-deshi-style');
 

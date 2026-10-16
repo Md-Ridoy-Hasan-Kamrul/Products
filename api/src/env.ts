@@ -18,6 +18,8 @@ const EnvSchema = z
 		ADMIN_EMAIL: z.email().default('admin@ypyd.local'),
 		ADMIN_PASSWORD: z.string().min(8).default(DEV_ADMIN_PASSWORD),
 		IMAGE_PROVIDER: z.enum(['mock', 'cloudinary']).default('mock'),
+		// auto: a new shop is live at once. manual: an admin approves it first.
+		VENDOR_APPROVAL: z.enum(['auto', 'manual']).default('auto'),
 		CLOUDINARY_CLOUD_NAME: optionalString,
 		CLOUDINARY_API_KEY: optionalString,
 		CLOUDINARY_API_SECRET: optionalString,
