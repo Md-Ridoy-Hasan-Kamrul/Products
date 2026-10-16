@@ -17,6 +17,17 @@ export default defineConfig({
 			name: 'chromium',
 			use: { ...devices['Desktop Chrome'] },
 		},
+		// Safari restores scroll differently on Back; it is where the category "shake" showed up.
+		{
+			name: 'webkit',
+			use: { ...devices['Desktop Safari'] },
+			testMatch: /navigation-stability/,
+		},
+		{
+			name: 'mobile-safari',
+			use: { ...devices['iPhone 13'] },
+			testMatch: /navigation-stability/,
+		},
 	],
 	webServer: [
 		{

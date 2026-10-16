@@ -1,4 +1,7 @@
 {
-  "recommendations": ["astro-build.astro-vscode"],
-  "unwantedRecommendations": ["svelte.svelte-vscode"]
+    "recommendations": [
+        "myml.vscode-markdown-plantuml-preview",
+        "esbenp.prettier-vscode",
+        "jebbs.plantuml"
+    ]
 }

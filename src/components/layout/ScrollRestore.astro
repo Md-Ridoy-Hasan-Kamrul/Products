@@ -1,0 +1,64 @@
+---
+/**
+ * Back/Forward lands exactly where the visitor left, with no visible jump.
+ *
+ * Browsers restore scroll while a reloaded page is still parsing; on a long
+ * page (home) Safari lands short, paints, then corrects: the "shake" seen
+ * when going to a category and back. Instead, the page stays hidden until the
+ * whole document is laid out, then scrolls once and shows.
+ *
+ * Use `part="head"` inside <head> and `part="end"` as the last child of <body>.
+ * Pages restored from the back/forward cache never run this: they come back as they were.
+ */
+interface Props {
+	part: 'head' | 'end';
+}
+
+const { part } = Astro.props;
+const STORAGE_PREFIX = 'ypyd:scroll:';
+/** Upper bound for keeping the page hidden, in case the end script never runs. */
+const MAX_HIDDEN_MS = 1000;
+---
+
+{
+	part === 'head' ? (
+		<script is:inline define:vars={{ STORAGE_PREFIX, MAX_HIDDEN_MS }}>
+			(() => {
+				const html = document.documentElement;
+				const key = STORAGE_PREFIX + location.pathname + location.search;
+				const show = () => {
+					html.style.visibility = '';
+					delete html.dataset.restoreScroll;
+				};
+				try {
+					history.scrollRestoration = 'manual';
+					const type = performance.getEntriesByType('navigation')[0]?.type;
+					const saved = sessionStorage.getItem(key);
+					if ((type === 'back_forward' || type === 'reload') && saved !== null) {
+						html.dataset.restoreScroll = saved;
+						html.style.visibility = 'hidden';
+						setTimeout(show, MAX_HIDDEN_MS);
+					}
+				} catch {
+					show();
+				}
+				addEventListener('pagehide', () => {
+					try {
+						sessionStorage.setItem(key, String(Math.round(scrollY)));
+					} catch {}
+				});
+			})();
+		</script>
+	) : (
+		<script is:inline>
+			(() => {
+				const html = document.documentElement;
+				const saved = html.dataset.restoreScroll;
+				if (saved === undefined) return;
+				scrollTo({ top: Number(saved), behavior: 'instant' });
+				delete html.dataset.restoreScroll;
+				html.style.visibility = '';
+			})();
+		</script>
+	)
+}
