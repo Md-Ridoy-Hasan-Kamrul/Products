@@ -1,14 +1,14 @@
 import { BPS_PER_PERCENT, POISHA_PER_TAKA } from './constants';
 
-const bdt = new Intl.NumberFormat('en-BD', {
-	style: 'currency',
-	currency: 'BDT',
-	currencyDisplay: 'narrowSymbol',
-	maximumFractionDigits: 2,
-});
+const TAKA_SIGN = '৳';
+const PAISA_DIGITS = 2;
+// Not the 'en-BD' currency style: browsers ship different locale data for it
+// (Safari puts ৳ after the number), so server and client HTML would differ
+// and React hydration would fail. Plain en-US digit grouping is the same everywhere.
+const taka = new Intl.NumberFormat('en-US', { minimumFractionDigits: PAISA_DIGITS, maximumFractionDigits: PAISA_DIGITS });
 
 export function formatBdt(minor: number): string {
-	return bdt.format(minor / POISHA_PER_TAKA);
+	return `${TAKA_SIGN}${taka.format(minor / POISHA_PER_TAKA)}`;
 }
 
 export function groupByCategory<T extends { category: string }>(items: T[]): [string, T[]][] {

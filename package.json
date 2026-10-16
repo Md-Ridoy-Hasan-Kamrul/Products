@@ -1,45 +1,45 @@
 {
-	"name": "ypyd-web",
-	"type": "module",
-	"version": "0.0.1",
-	"engines": {
-		"node": ">=22.12.0"
-	},
-	"scripts": {
-		"dev": "node scripts/dev.mjs --open",
-		"dev:web": "astro dev --open",
-		"dev:api": "npm --prefix api run dev",
-		"test:api": "npm --prefix api test",
-		"build": "astro build",
-		"astro": "astro",
-		"test": "vitest run",
-		"test:watch": "vitest",
-		"test:e2e": "playwright test",
-		"test:e2e:ui": "playwright test --ui",
-		"preview": "astro preview",
-		"start": "node dist/server/entry.mjs"
-	},
-	"dependencies": {
-		"@astrojs/node": "^11.1.8",
-		"@astrojs/react": "^7.0.1",
-		"@fontsource-variable/figtree": "^5.3.0",
-		"@tailwindcss/vite": "^4.3.3",
-		"astro": "^7.3.3",
-		"lucide-react": "^1.56.0",
-		"react": "^19.3.0",
-		"react-dom": "^19.3.0",
-		"tailwindcss": "^4.3.3",
-		"typescript": "^6.0.3"
-	},
-	"allowScripts": {
-		"esbuild": true
-	},
-	"devDependencies": {
-		"@astrojs/sitemap": "^3.7.4",
-		"@playwright/test": "^1.63.0",
-		"@types/node": "^26.6.2",
-		"@types/react": "^19.3.0",
-		"@types/react-dom": "^19.3.0",
-		"vitest": "^5.0.1"
-	}
+  "name": "ypyd-web",
+  "type": "module",
+  "version": "0.0.1",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "node api.js && node scripts/dev.mjs --open",
+    "dev:web": "astro dev --open",
+    "dev:api": "npm --prefix api run dev",
+    "test:api": "npm --prefix api test",
+    "build": "node api.js && astro build",
+    "astro": "astro",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "preview": "astro preview",
+    "start": "node api.js && node dist/server/entry.mjs"
+  },
+  "dependencies": {
+    "@astrojs/node": "^11.1.8",
+    "@astrojs/react": "^7.0.1",
+    "@fontsource-variable/figtree": "^5.3.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.3.3",
+    "lucide-react": "^1.56.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^6.0.3"
+  },
+  "allowScripts": {
+    "esbuild": true
+  },
+  "devDependencies": {
+    "@astrojs/sitemap": "^3.7.4",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "vitest": "^5.0.1"
+  }
 }
