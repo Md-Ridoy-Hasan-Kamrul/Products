@@ -2,6 +2,7 @@
 
 @theme {
 	--font-body: "Figtree Variable", "Figtree", system-ui, sans-serif;
+	--leading-body: 1.55;
 	--color-brand: #f2541b;
 	--color-brand-deep: #c93f0d;
 	--color-brand-soft: #fff1ea;
@@ -12,26 +13,6 @@
 	--color-line: rgb(27 31 36 / 0.1);
 	--color-wa: #15803d;
 	--color-wa-deep: #166534;
-}
-
-@layer base {
-	html {
-		scroll-behavior: smooth;
-	}
-
-	body {
-		min-height: 100%;
-		margin: 0;
-		font-family: var(--font-body);
-		font-size: 1rem;
-		line-height: 1.55;
-		color: var(--color-ink);
-		background: var(--color-canvas);
-	}
-
-	:disabled {
-		cursor: not-allowed;
-	}
 }
 
 @utility container-page {

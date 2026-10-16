@@ -9,11 +9,11 @@ const { title } = Astro.props;
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 	<head>
 		<Head title={title} description="Your Products Your Dreams back office." noindex />
 	</head>
-	<body class="min-h-screen">
+	<body class="min-h-screen font-body text-base leading-body text-ink bg-canvas [&_:disabled]:cursor-not-allowed">
 		<slot />
 	</body>
 </html>

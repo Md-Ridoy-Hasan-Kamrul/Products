@@ -1,9 +1,13 @@
 import { expect, test } from 'vitest';
 import { formatBdt, formatDay, groupByCategory, toCsv } from './format';
 
-test('formats poisha as taka', () => {
-	expect(formatBdt(25_000)).toMatch(/250/);
-	expect(formatBdt(25_050)).toMatch(/250\.5/);
+test('formats poisha as taka, identically on every browser engine', () => {
+	// Exact strings: the server and Safari must produce the same text, or React hydration fails.
+	expect(formatBdt(25_000)).toBe('৳250.00');
+	expect(formatBdt(25_050)).toBe('৳250.50');
+	expect(formatBdt(145_000)).toBe('৳1,450.00');
+	expect(formatBdt(1_234_567_89)).toBe('৳1,234,567.89');
+	expect(formatBdt(0)).toBe('৳0.00');
 });
 
 test('groups items by category in first-seen order', () => {
