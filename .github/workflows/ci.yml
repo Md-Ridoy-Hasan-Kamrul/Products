@@ -66,7 +66,7 @@ jobs:
             api/package-lock.json
       - run: npm ci
       - run: npm --prefix api ci
-      - run: npx playwright install chromium --with-deps
+      - run: npx playwright install chromium webkit --with-deps
       - run: npm run test:e2e
         env:
           CI: true
