@@ -74,7 +74,7 @@
 │   │   ├── products/     ProductCard, ProductGrid, OrderNowButton, ProductImage, WhatsAppIcon
 │   │   ├── search/       SearchResults.tsx
 │   │   ├── auth/         LoginForm.tsx, VendorAccess.tsx
-│   │   └── dashboards/   VendorDashboard.tsx, AdminDashboard.tsx, ui.tsx (লগইন চেক, sidebar shell, কার্ড, টেবিল)
+│   │   └── dashboards/   VendorDashboard.tsx (Overview, Products, Order intents, Shop & billing), AdminDashboard.tsx (Overview, Vendors, Products, Order intents), ActivityChart.tsx, IntentTable.tsx, ProductEditor.tsx, ui.tsx (লগইন চেক, sidebar shell, sort/search/filter, কার্ড)
 │   ├── lib/              api.ts, auth.ts, whatsapp.ts, categories.ts, format.ts, types.ts
 │   └── styles/global.css কমলা brand, Order Now সবুজ
 ├── scripts/dev.mjs   Web + API একসাথে চালায়
@@ -96,7 +96,7 @@
 
 1. "Order Now" একটি আসল লিংক: `https://wa.me/{vendor_phone}?text=Hi, I want to order this: {title} - {product_url}`। JS লোড না হলেও কাজ করে, popup blocker আটকায় না।
 2. ক্লিকে `POST /api/orders/click` (`keepalive`) একটি order intent লেখে।
-3. Admin ড্যাশবোর্ড vendor-প্রতি intent সংখ্যা ও পাওনা কমিশন দেখায়।
+3. Admin ড্যাশবোর্ড vendor-প্রতি intent সংখ্যা ও পাওনা কমিশন দেখায়, vendor নিজের Seller Center-এ নিজের intent আর কমিশন দেখে। দুই ড্যাশবোর্ডেই টেবিল CSV-তে export করা যায়।
 
 | Endpoint | কাজ |
 | --- | --- |
@@ -107,9 +107,10 @@
 | `POST /api/auth/sign-in/email`, `POST /api/auth/sign-out`, `GET /api/auth/get-session` | Better Auth লগইন (cookie) |
 | `POST /api/vendor/register` | `{ shopName, phone, email, password }` → নতুন দোকান + vendor লগইন |
 | `GET /api/vendor/me`, `GET/POST /api/vendor/products` | vendor লগইন লাগে |
+| `GET /api/vendor/insights` | vendor লগইন লাগে। শুধু নিজের intent: মোট, ১৪ দিনের দৈনিক হিসাব, প্রোডাক্ট-প্রতি সংখ্যা, শেষ ১০০টি intent |
 | `PATCH/DELETE /api/vendor/products/:id` | শুধু নিজের প্রোডাক্ট edit/delete। Delete মানে লুকানো (soft delete), পুরোনো order intent-এ নাম থেকে যায় |
 | `POST /api/uploads` | vendor লগইন লাগে। `{ dataUrl }` (PNG/JPEG/WebP, ≤২ MB) → `{ url }` |
-| `GET /api/admin/summary` | admin লগইন লাগে |
+| `GET /api/admin/summary` | admin লগইন লাগে। মোট, vendor-প্রতি কমিশন, ১৪ দিনের দৈনিক হিসাব, প্রোডাক্ট-প্রতি সংখ্যা, শেষ ১০০টি intent (vendor নামসহ) |
 
 ## লগইন
 

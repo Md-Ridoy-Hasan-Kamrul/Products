@@ -6,6 +6,8 @@ import { loadEnv } from './env.js';
 import { commissionFor } from './store/commission.js';
 import { MemoryStore } from './store/memory.js';
 import { DEMO_VENDOR_PASSWORD, createSeededStore } from './store/seed.js';
+import { dailySeries, productStats, totalsOf } from './store/stats.js';
+import type { OrderIntent } from './store/types.js';
 
 const WEB_ORIGIN = 'http://web.test';
 const ADMIN = { email: 'admin@test.local', password: 'test-admin-pass' };
@@ -84,6 +86,51 @@ describe('commission', () => {
 			(intent as { priceMinor: number }).priceMinor = 1;
 		}).toThrow();
 		expect(store.listOrderIntents()).toHaveLength(1);
+	});
+});
+
+describe('stats', () => {
+	const intent = (productId: string, createdAt: string, priceMinor = 10_000): OrderIntent => ({
+		id: `${productId}-${createdAt}`,
+		productId,
+		vendorId: 'v',
+		priceMinor,
+		commissionBps: 1000,
+		commissionMinor: priceMinor / 10,
+		createdAt,
+	});
+
+	test('totals, per-product counts busiest first, and a zero-filled daily series in Dhaka time', () => {
+		const intents = [
+			intent('a', '2026-10-16T20:00:00Z'), // 17 Oct 02:00 in Dhaka
+			intent('b', '2026-10-17T05:00:00Z', 30_000),
+			intent('b', '2026-10-10T05:00:00Z'), // outside a 3-day window
+		];
+		expect(totalsOf(intents)).toEqual({ orderIntents: 3, grossMinor: 50_000, commissionOwedMinor: 5_000 });
+		expect(productStats(intents).map((s) => [s.productId, s.orderIntents])).toEqual([
+			['b', 2],
+			['a', 1],
+		]);
+		expect(dailySeries(intents, 3, new Date('2026-10-17T12:00:00Z'))).toEqual([
+			{ date: '2026-10-15', orderIntents: 0, commissionMinor: 0 },
+			{ date: '2026-10-16', orderIntents: 0, commissionMinor: 0 },
+			{ date: '2026-10-17', orderIntents: 2, commissionMinor: 4_000 },
+		]);
+	});
+
+	test('the store indexes intents per vendor', () => {
+		const store = new MemoryStore();
+		const [one, two] = ['8801711000007', '8801711000008'].map((phone) => store.addVendor({ name: phone, phone }));
+		const item = (vendorId: string) =>
+			store.addProduct({ vendorId, title: 'Item', description: '', category: 'fashion', priceMinor: 10_000, imageUrl: null });
+		store.recordOrderIntent(item(one!.id).id);
+		store.recordOrderIntent(item(two!.id).id);
+		store.recordOrderIntent(item(two!.id).id);
+		expect(store.listOrderIntents({ vendorId: two!.id })).toHaveLength(2);
+		expect(store.commissionSummary().map((row) => [row.productCount, row.orderIntentCount])).toEqual([
+			[1, 1],
+			[2, 2],
+		]);
 	});
 });
 
@@ -210,10 +257,33 @@ describe('POST /api/orders/click', () => {
 		expect(after.totals.orderIntents).toBe(before.totals.orderIntents + 1);
 		expect(after.totals.commissionOwedMinor - before.totals.commissionOwedMinor).toBe(24_900);
 		expect(after.recentOrderIntents[0].productTitle).toBe('Wireless Earbuds Pro with Noise Cancelling');
+		expect(after.recentOrderIntents[0].vendorName).toBe('Gadget Haat');
+		expect(after.daily).toHaveLength(14);
 	});
 
 	test('admin summary needs a login', async () => {
 		expect((await api('/api/admin/summary')).status).toBe(401);
+	});
+});
+
+describe('GET /api/vendor/insights', () => {
+	test('requires a vendor login', async () => {
+		expect((await api('/api/vendor/insights')).status).toBe(401);
+	});
+
+	test("counts only the vendor's own order intents", async () => {
+		const insights = async () => (await api('/api/vendor/insights', { headers: { cookie: vendorCookie } })).json();
+		const before = await insights();
+
+		await post('/api/orders/click', { productId: 'wireless-earbuds-pro' });
+		await post('/api/orders/click', { productId: 'cotton-panjabi' }); // another vendor
+
+		const after = await insights();
+		expect(after.totals.orderIntents).toBe(before.totals.orderIntents + 1);
+		expect(after.daily).toHaveLength(14);
+		expect(after.daily.at(-1).orderIntents).toBeGreaterThan(0);
+		expect(after.recentOrderIntents.every((i: { vendorId: string }) => i.vendorId === 'vendor-gadget-haat')).toBe(true);
+		expect(after.productStats.find((s: { productId: string }) => s.productId === 'wireless-earbuds-pro')).toBeTruthy();
 	});
 });
 

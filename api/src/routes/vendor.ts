@@ -2,7 +2,9 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { createCredentialUser, EmailTakenError, requireVendor, type Auth } from '../auth.js';
 import type { MemoryStore } from '../store/memory.js';
+import { dailySeries, productStats, totalsOf } from '../store/stats.js';
 import { CATEGORY_SLUGS } from '../store/types.js';
+import { CHART_DAYS, recentIntents } from './insights.js';
 
 const NewProductBody = z.object({
 	title: z.string().trim().min(2).max(200),
@@ -73,6 +75,16 @@ export function vendorRouter(store: MemoryStore, auth: Auth) {
 
 	router.get('/me', (_req, res) => {
 		res.json({ vendor: res.locals.vendor });
+	});
+
+	router.get('/insights', (_req, res) => {
+		const intents = store.listOrderIntents({ vendorId: res.locals.vendor!.id });
+		res.json({
+			totals: totalsOf(intents),
+			daily: dailySeries(intents, CHART_DAYS),
+			productStats: productStats(intents),
+			recentOrderIntents: recentIntents(store, intents),
+		});
 	});
 
 	router.get('/products', (_req, res) => {

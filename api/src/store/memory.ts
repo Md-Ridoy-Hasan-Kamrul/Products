@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { commissionFor } from './commission.js';
+import { totalsOf } from './stats.js';
 import {
 	STANDARD_COMMISSION_BPS,
 	type CategorySlug,
@@ -41,6 +42,8 @@ export class MemoryStore {
 	readonly #vendors = new Map<string, Vendor>();
 	readonly #products = new Map<string, StoredProduct>();
 	readonly #orderIntents: OrderIntent[] = [];
+	/** Same rows as #orderIntents, indexed by vendor so per-vendor reads skip the full ledger. */
+	readonly #intentsByVendor = new Map<string, OrderIntent[]>();
 
 	addVendor(input: Pick<Vendor, 'name' | 'phone'> & { id?: string; commissionBps?: number }): Vendor {
 		const vendor: Vendor = {
@@ -131,23 +134,35 @@ export class MemoryStore {
 			createdAt: new Date().toISOString(),
 		});
 		this.#orderIntents.push(intent);
+		const byVendor = this.#intentsByVendor.get(vendor.id);
+		if (byVendor) byVendor.push(intent);
+		else this.#intentsByVendor.set(vendor.id, [intent]);
 		return intent;
 	}
 
-	listOrderIntents(): readonly OrderIntent[] {
-		return [...this.#orderIntents];
+	/** Oldest first. Read-only view of the append-only ledger, optionally for one vendor. */
+	listOrderIntents({ vendorId }: { vendorId?: string } = {}): readonly OrderIntent[] {
+		return vendorId ? (this.#intentsByVendor.get(vendorId) ?? []) : this.#orderIntents;
+	}
+
+	/** Title of any product, deleted or not, for labelling ledger rows. */
+	productTitle(id: string): string | null {
+		return this.#products.get(id)?.title ?? null;
 	}
 
 	commissionSummary(): VendorCommissionSummary[] {
-		const live = this.#liveProducts();
+		const productCounts = new Map<string, number>();
+		for (const product of this.#liveProducts()) {
+			productCounts.set(product.vendorId, (productCounts.get(product.vendorId) ?? 0) + 1);
+		}
 		return this.listVendors().map((vendor) => {
-			const intents = this.#orderIntents.filter((intent) => intent.vendorId === vendor.id);
+			const totals = totalsOf(this.listOrderIntents({ vendorId: vendor.id }));
 			return {
 				vendor,
-				productCount: live.filter((p) => p.vendorId === vendor.id).length,
-				orderIntentCount: intents.length,
-				grossMinor: intents.reduce((sum, intent) => sum + intent.priceMinor, 0),
-				commissionOwedMinor: intents.reduce((sum, intent) => sum + intent.commissionMinor, 0),
+				productCount: productCounts.get(vendor.id) ?? 0,
+				orderIntentCount: totals.orderIntents,
+				grossMinor: totals.grossMinor,
+				commissionOwedMinor: totals.commissionOwedMinor,
 			};
 		});
 	}

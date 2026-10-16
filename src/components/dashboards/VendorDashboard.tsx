@@ -1,53 +1,78 @@
-import { CheckCircle2, ImagePlus, Package, Pencil, Percent, Plus, Trash2, Wallet, X } from 'lucide-react';
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import {
+	ArrowRight,
+	Coins,
+	Download,
+	LayoutDashboard,
+	MousePointerClick,
+	Package,
+	Pencil,
+	Percent,
+	Plus,
+	ReceiptText,
+	Store,
+	Trash2,
+} from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { apiFetch } from '../../lib/api';
 import type { SessionUser } from '../../lib/auth';
 import { CATEGORIES, categoryBySlug } from '../../lib/categories';
-import { formatBdt } from '../../lib/format';
-import type { Product, Vendor } from '../../lib/types';
+import { downloadCsv, formatBdt, formatDate, formatPercent } from '../../lib/format';
+import type { OrderIntentRow, Product, Vendor, VendorInsights } from '../../lib/types';
 import { productPath } from '../../lib/whatsapp';
 import ProductImage from '../products/ProductImage';
+import ActivityChart from './ActivityChart';
+import IntentTable from './IntentTable';
+import { DeleteDialog, ProductDrawer } from './ProductEditor';
 import {
 	Badge,
 	Card,
 	DashboardShell,
+	Detail,
 	EmptyState,
 	ErrorNote,
+	FilterSelect,
+	Notice,
+	SearchInput,
 	SessionGate,
+	SortTh,
 	Stat,
-	field,
+	StatGrid,
+	TableFoot,
+	TableSkeleton,
+	Toolbar,
+	iconButton,
 	primaryButton,
+	row,
 	secondaryButton,
+	table,
+	tbody,
 	td,
 	th,
+	useApi,
 	useRequiredSession,
+	useSection,
+	useSort,
+	type NavItem,
 } from './ui';
 
-const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
-const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
-const addedOn = new Intl.DateTimeFormat('en-BD', { dateStyle: 'medium' });
-const iconButton = 'rounded-lg p-2 text-ink-soft hover:bg-canvas hover:text-ink';
+const SECTIONS = ['overview', 'products', 'orders', 'shop'] as const;
+type Section = (typeof SECTIONS)[number];
+
+const NO_PRODUCTS: Product[] = [];
 
 type Editing = { mode: 'add' } | { mode: 'edit'; product: Product };
 
-function readAsDataUrl(file: File): Promise<string> {
-	return new Promise((resolve, reject) => {
-		const reader = new FileReader();
-		reader.onload = () => resolve(reader.result as string);
-		reader.onerror = () => reject(reader.error);
-		reader.readAsDataURL(file);
-	});
-}
-
 export default function VendorDashboard() {
 	const session = useRequiredSession('vendor');
-	return <SessionGate state={session}>{(user) => <Shop user={user} />}</SessionGate>;
+	return <SessionGate state={session}>{(user) => <SellerCenter user={user} />}</SessionGate>;
 }
 
-function Shop({ user }: { user: SessionUser }) {
+function SellerCenter({ user }: { user: SessionUser }) {
+	const [section, go] = useSection(SECTIONS);
 	const [vendor, setVendor] = useState<Vendor | null>(null);
-	const [products, setProducts] = useState<Product[]>([]);
+	const [products, setProducts] = useState<Product[] | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const insights = useApi<VendorInsights>('/api/vendor/insights');
 	const [editing, setEditing] = useState<Editing | null>(null);
 	const [deleting, setDeleting] = useState<Product | null>(null);
 	const [notice, setNotice] = useState<string | null>(null);
@@ -64,7 +89,19 @@ function Shop({ user }: { user: SessionUser }) {
 			.catch((e: Error) => setError(e.message));
 	}, []);
 
-	const catalogValue = products.reduce((sum, product) => sum + product.priceMinor, 0);
+	/** Order intents per product id, for the product table and top list. */
+	const intentsByProduct = useMemo(
+		() => new Map((insights.data?.productStats ?? []).map((stat) => [stat.productId, stat.orderIntents])),
+		[insights.data],
+	);
+
+	const nav: NavItem<Section>[] = [
+		{ id: 'overview', label: 'Overview', icon: LayoutDashboard },
+		{ id: 'products', label: 'Products', icon: Package, count: products?.length },
+		{ id: 'orders', label: 'Order intents', icon: ReceiptText, count: insights.data?.totals.orderIntents },
+		{ id: 'shop', label: 'Shop & billing', icon: Store },
+	];
+
 	const addButton = (
 		<button type="button" className={primaryButton} onClick={() => setEditing({ mode: 'add' })}>
 			<Plus className="size-4" aria-hidden="true" /> Add product
@@ -73,125 +110,54 @@ function Shop({ user }: { user: SessionUser }) {
 
 	function saved(product: Product) {
 		const isNew = editing?.mode === 'add';
-		setProducts((list) => (isNew ? [product, ...list] : list.map((p) => (p.id === product.id ? product : p))));
+		setProducts((list) => (isNew ? [product, ...(list ?? [])] : (list ?? []).map((p) => (p.id === product.id ? product : p))));
 		setEditing(null);
 		setNotice(
-			isNew
-				? `“${product.title}” is live. It shows on the storefront after the next build.`
-				: `“${product.title}” was updated.`,
+			isNew ? `“${product.title}” is live. It shows on the storefront after the next build.` : `“${product.title}” was updated.`,
 		);
+		if (isNew) go('products');
 	}
 
 	function deleted(product: Product) {
-		setProducts((list) => list.filter((p) => p.id !== product.id));
+		setProducts((list) => (list ?? []).filter((p) => p.id !== product.id));
 		setDeleting(null);
 		setNotice(`“${product.title}” was deleted.`);
 	}
 
+	const shopName = vendor?.name ?? user.name;
+	const headers: Record<Section, { title: string; description: string; actions?: ReactNode }> = {
+		overview: { title: shopName, description: 'How your shop is doing. Buyers order your products on WhatsApp.', actions: addButton },
+		products: { title: 'Products', description: 'Everything listed in your shop.', actions: addButton },
+		orders: { title: 'Order intents', description: 'Every Order Now click on your products, with the commission it adds.' },
+		shop: { title: 'Shop & billing', description: 'Your shop details and how commission is charged.' },
+	};
+
 	return (
-		<DashboardShell
-			role="vendor"
-			user={user}
-			title={vendor?.name ?? user.name}
-			description="Manage your products. Buyers order them on WhatsApp."
-			actions={addButton}
-		>
+		<DashboardShell role="vendor" user={user} nav={nav} section={section} workspace={shopName} {...headers[section]}>
 			{error && <ErrorNote message={error} />}
-			{notice && (
-				<p role="status" className="m-0 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-					<CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
-					{notice}
-				</p>
-			)}
+			{insights.error && <ErrorNote message={insights.error} onRetry={insights.reload} />}
+			{notice && <Notice message={notice} onDismiss={() => setNotice(null)} />}
 
-			<div className="grid gap-4 min-[640px]:grid-cols-3">
-				<Stat label="Products" value={String(products.length)} icon={Package} hint="Live on the storefront" />
-				<Stat label="Catalog value" value={formatBdt(catalogValue)} icon={Wallet} hint="Sum of listed prices" />
-				<Stat
-					label="Commission rate"
-					value={vendor ? `${vendor.commissionBps / 100}%` : '—'}
-					icon={Percent}
-					hint="Charged per order intent"
+			{section === 'overview' && (
+				<Overview
+					vendor={vendor}
+					products={products}
+					insights={insights.data}
+					intentsByProduct={intentsByProduct}
+					addButton={addButton}
 				/>
-			</div>
-
-			<Card title="Products" description={`${products.length} listed`} id="my-products" flush>
-				{products.length === 0 ? (
-					<EmptyState
-						icon={Package}
-						title="No products yet"
-						text="Add your first product and buyers can order it on WhatsApp right away."
-						action={addButton}
-					/>
-				) : (
-					<div className="overflow-x-auto">
-						<table className="w-full border-collapse text-sm">
-							<thead>
-								<tr>
-									<th className={th}>Product</th>
-									<th className={th}>Category</th>
-									<th className={`${th} text-right`}>Price</th>
-									<th className={th}>Status</th>
-									<th className={th}>Added</th>
-									<th className={`${th} text-right`}>
-										<span className="sr-only">Actions</span>
-									</th>
-								</tr>
-							</thead>
-							<tbody className="[&>tr:last-child>td]:border-b-0">
-								{products.map((product) => (
-									<tr key={product.id} className="hover:bg-canvas/50">
-										<td className={td}>
-											<div className="flex items-center gap-3">
-												<ProductImage
-													title={product.title}
-													imageUrl={product.imageUrl}
-													category={product.category}
-													className="size-10 shrink-0 rounded-md"
-												/>
-												<a
-													href={productPath(product.id)}
-													className="max-w-xs truncate font-medium text-ink no-underline hover:text-brand"
-												>
-													{product.title}
-												</a>
-											</div>
-										</td>
-										<td className={`${td} text-ink-soft`}>{categoryBySlug(product.category).name}</td>
-										<td className={`${td} text-right font-medium tabular-nums`}>{formatBdt(product.priceMinor)}</td>
-										<td className={td}>
-											<Badge tone="success">Live</Badge>
-										</td>
-										<td className={`${td} text-ink-soft`}>{addedOn.format(new Date(product.createdAt))}</td>
-										<td className={`${td} text-right`}>
-											<div className="inline-flex gap-1">
-												<button
-													type="button"
-													className={iconButton}
-													aria-label={`Edit ${product.title}`}
-													title="Edit"
-													onClick={() => setEditing({ mode: 'edit', product })}
-												>
-													<Pencil className="size-4" aria-hidden="true" />
-												</button>
-												<button
-													type="button"
-													className={`${iconButton} hover:bg-red-50 hover:text-red-700`}
-													aria-label={`Delete ${product.title}`}
-													title="Delete"
-													onClick={() => setDeleting(product)}
-												>
-													<Trash2 className="size-4" aria-hidden="true" />
-												</button>
-											</div>
-										</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
-					</div>
-				)}
-			</Card>
+			)}
+			{section === 'products' && (
+				<ProductsSection
+					products={products}
+					intentsByProduct={intentsByProduct}
+					addButton={addButton}
+					onEdit={(product) => setEditing({ mode: 'edit', product })}
+					onDelete={setDeleting}
+				/>
+			)}
+			{section === 'orders' && <OrdersSection intents={insights.data?.recentOrderIntents ?? null} total={insights.data?.totals.orderIntents ?? 0} />}
+			{section === 'shop' && <ShopSection vendor={vendor} user={user} insights={insights.data} />}
 
 			{editing && (
 				<ProductDrawer
@@ -205,302 +171,294 @@ function Shop({ user }: { user: SessionUser }) {
 	);
 }
 
-/** Closes on Escape and locks page scroll while a panel or dialog is open. */
-function useModal(onClose: () => void) {
-	useEffect(() => {
-		const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
-		window.addEventListener('keydown', onKey);
-		document.body.style.overflow = 'hidden';
-		return () => {
-			window.removeEventListener('keydown', onKey);
-			document.body.style.overflow = '';
-		};
-	}, [onClose]);
-}
+/* ---------- Overview ---------- */
 
-function Backdrop({ onClose }: { onClose: () => void }) {
-	return <button type="button" aria-label="Close" tabIndex={-1} className="absolute inset-0 bg-ink/40" onClick={onClose} />;
-}
-
-function ProductDrawer({
-	product,
-	onClose,
-	onSaved,
+function Overview({
+	vendor,
+	products,
+	insights,
+	intentsByProduct,
+	addButton,
 }: {
-	/** null to add a new product. */
-	product: Product | null;
-	onClose: () => void;
-	onSaved: (product: Product) => void;
+	vendor: Vendor | null;
+	products: Product[] | null;
+	insights: VendorInsights | null;
+	intentsByProduct: Map<string, number>;
+	addButton: ReactNode;
 }) {
-	const [saving, setSaving] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [preview, setPreview] = useState<string | null>(null);
-	const [keptImage, setKeptImage] = useState<string | null>(product?.imageUrl ?? null);
-	const fileInput = useRef<HTMLInputElement>(null);
-	const firstField = useRef<HTMLInputElement>(null);
-	useModal(onClose);
-	useEffect(() => firstField.current?.focus(), []);
-	useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
+	const lastTwoWeeks = insights?.daily.reduce((sum, day) => sum + day.orderIntents, 0);
+	const top = useMemo(
+		() =>
+			(products ?? [])
+				.map((product) => ({ product, intents: intentsByProduct.get(product.id) ?? 0 }))
+				.filter((entry) => entry.intents > 0)
+				.sort((a, b) => b.intents - a.intents)
+				.slice(0, 5),
+		[products, intentsByProduct],
+	);
 
-	const shownImage = preview ?? keptImage;
-	const heading = product ? 'Edit product' : 'Add a product';
+	return (
+		<>
+			<StatGrid>
+				<Stat label="Live products" value={products ? String(products.length) : null} icon={Package} hint="Listed on the storefront" />
+				<Stat
+					label="Order intents"
+					value={insights ? String(insights.totals.orderIntents) : null}
+					icon={MousePointerClick}
+					hint={lastTwoWeeks !== undefined ? `${lastTwoWeeks} in the last 14 days` : undefined}
+				/>
+				<Stat
+					label="Commission owed"
+					value={insights ? formatBdt(insights.totals.commissionOwedMinor) : null}
+					icon={Coins}
+					tone="brand"
+					hint="All time, not yet billed"
+				/>
+				<Stat label="Commission rate" value={vendor ? formatPercent(vendor.commissionBps) : null} icon={Percent} hint="Per order intent" />
+			</StatGrid>
 
-	function removeImage() {
-		setPreview(null);
-		setKeptImage(null);
-		if (fileInput.current) fileInput.current.value = '';
+			{products?.length === 0 && (
+				<Card title="Get started" id="get-started">
+					<EmptyState
+						icon={Package}
+						title="Add your first product"
+						text="Give it a name, price, and photo. Buyers can order it on WhatsApp as soon as it's live."
+						action={addButton}
+					/>
+				</Card>
+			)}
+
+			<div className="grid gap-6 min-[1200px]:grid-cols-3">
+				<Card title="Activity" description="Order Now clicks over the last 14 days." id="activity" className="min-[1200px]:col-span-2">
+					{insights ? <ActivityChart daily={insights.daily} /> : <ChartSkeleton />}
+				</Card>
+				<Card title="Top products" description="By order intents, all time." id="top-products" flush>
+					{top.length === 0 ? (
+						<p className="m-0 px-5 py-8 text-center text-sm text-ink-soft">No clicks yet. Share your product links to get started.</p>
+					) : (
+						<ol className="m-0 list-none divide-y divide-line p-0">
+							{top.map(({ product, intents }, index) => (
+								<li key={product.id} className="flex items-center gap-3 px-5 py-3">
+									<span className="w-4 text-xs font-semibold text-ink-soft tabular-nums">{index + 1}</span>
+									<ProductImage title={product.title} imageUrl={product.imageUrl} category={product.category} className="size-9 shrink-0 rounded-md" />
+									<span className="min-w-0 flex-1 truncate text-sm font-medium">{product.title}</span>
+									<span className="text-sm font-semibold tabular-nums">{intents}</span>
+								</li>
+							))}
+						</ol>
+					)}
+				</Card>
+			</div>
+
+			<Card
+				title="Latest order intents"
+				id="latest"
+				flush
+				actions={
+					<a href="#orders" className="inline-flex items-center gap-1 text-sm font-semibold text-brand no-underline hover:underline">
+						View all <ArrowRight className="size-4" aria-hidden="true" />
+					</a>
+				}
+			>
+				<IntentTable intents={insights?.recentOrderIntents.slice(0, 5) ?? null} />
+			</Card>
+		</>
+	);
+}
+
+function ChartSkeleton() {
+	return <div className="h-56 animate-pulse rounded-lg bg-canvas" aria-label="Loading chart" />;
+}
+
+/* ---------- Products ---------- */
+
+function ProductsSection({
+	products,
+	intentsByProduct,
+	addButton,
+	onEdit,
+	onDelete,
+}: {
+	products: Product[] | null;
+	intentsByProduct: Map<string, number>;
+	addButton: ReactNode;
+	onEdit: (product: Product) => void;
+	onDelete: (product: Product) => void;
+}) {
+	const [query, setQuery] = useState('');
+	const [category, setCategory] = useState('');
+	const all = products ?? NO_PRODUCTS;
+
+	const filtered = useMemo(() => {
+		const q = query.trim().toLowerCase();
+		return all.filter((p) => (!category || p.category === category) && (!q || p.title.toLowerCase().includes(q)));
+	}, [all, query, category]);
+
+	const { sorted, sort, toggle } = useSort(
+		filtered,
+		{
+			title: (p) => p.title.toLowerCase(),
+			category: (p) => categoryBySlug(p.category).name,
+			price: (p) => p.priceMinor,
+			intents: (p) => intentsByProduct.get(p.id) ?? 0,
+			updated: (p) => p.updatedAt,
+		},
+		{ key: 'updated', dir: 'desc' },
+	);
+
+	if (products && products.length === 0) {
+		return (
+			<Card title="Products" id="my-products" flush>
+				<EmptyState icon={Package} title="No products yet" text="Add your first product and buyers can order it on WhatsApp right away." action={addButton} />
+			</Card>
+		);
 	}
 
-	async function submit(event: FormEvent<HTMLFormElement>) {
-		event.preventDefault();
-		const data = new FormData(event.currentTarget);
-		const file = data.get('image');
-		setError(null);
+	return (
+		<Card title="All products" description={`${all.length} listed`} id="my-products" flush>
+			<Toolbar>
+				<SearchInput value={query} onChange={setQuery} label="Search your products" />
+				<FilterSelect
+					label="Category"
+					value={category}
+					onChange={setCategory}
+					options={[{ value: '', label: 'All categories' }, ...CATEGORIES.map((c) => ({ value: c.slug, label: c.name }))]}
+				/>
+			</Toolbar>
+			{!products ? (
+				<TableSkeleton />
+			) : sorted.length === 0 ? (
+				<EmptyState icon={Package} title="No matching products" text="Try a different search or category." />
+			) : (
+				<div className="overflow-x-auto">
+					<table className={table}>
+						<thead>
+							<tr>
+								<SortTh label="Product" column="title" sort={sort} onSort={toggle} />
+								<SortTh label="Category" column="category" sort={sort} onSort={toggle} />
+								<SortTh label="Price" column="price" sort={sort} onSort={toggle} align="right" />
+								<SortTh label="Intents" column="intents" sort={sort} onSort={toggle} align="right" />
+								<th className={th}>Status</th>
+								<SortTh label="Updated" column="updated" sort={sort} onSort={toggle} />
+								<th className={`${th} text-right`}>
+									<span className="sr-only">Actions</span>
+								</th>
+							</tr>
+						</thead>
+						<tbody className={tbody}>
+							{sorted.map((product) => (
+								<tr key={product.id} className={row}>
+									<td className={td}>
+										<div className="flex items-center gap-3">
+											<ProductImage title={product.title} imageUrl={product.imageUrl} category={product.category} className="size-10 shrink-0 rounded-md" />
+											<a href={productPath(product.id)} className="max-w-xs truncate font-medium text-ink no-underline hover:text-brand">
+												{product.title}
+											</a>
+										</div>
+									</td>
+									<td className={`${td} text-ink-soft`}>{categoryBySlug(product.category).name}</td>
+									<td className={`${td} text-right font-medium tabular-nums`}>{formatBdt(product.priceMinor)}</td>
+									<td className={`${td} text-right tabular-nums`}>{intentsByProduct.get(product.id) ?? 0}</td>
+									<td className={td}>
+										<Badge tone="success">Live</Badge>
+									</td>
+									<td className={`${td} text-ink-soft`}>{formatDate(product.updatedAt)}</td>
+									<td className={`${td} text-right`}>
+										<div className="inline-flex gap-1">
+											<button type="button" className={iconButton} aria-label={`Edit ${product.title}`} title="Edit" onClick={() => onEdit(product)}>
+												<Pencil className="size-4" aria-hidden="true" />
+											</button>
+											<button
+												type="button"
+												className={`${iconButton} hover:bg-red-50 hover:text-red-700`}
+												aria-label={`Delete ${product.title}`}
+												title="Delete"
+												onClick={() => onDelete(product)}
+											>
+												<Trash2 className="size-4" aria-hidden="true" />
+											</button>
+										</div>
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+			)}
+			{products && sorted.length > 0 && <TableFoot shown={sorted.length} total={all.length} noun="products" />}
+		</Card>
+	);
+}
 
-		const image = file instanceof File && file.size > 0 ? file : null;
-		if (image && (!IMAGE_TYPES.includes(image.type) || image.size > MAX_IMAGE_BYTES)) {
-			setError('Image must be PNG, JPEG, or WebP, 2 MB or less.');
-			return;
-		}
+/* ---------- Orders ---------- */
 
-		setSaving(true);
-		try {
-			let imageUrl = keptImage;
-			if (image) {
-				const upload = await apiFetch<{ url: string }>('/api/uploads', {
-					method: 'POST',
-					body: JSON.stringify({ dataUrl: await readAsDataUrl(image) }),
-				});
-				imageUrl = upload.url;
+function OrdersSection({ intents, total }: { intents: OrderIntentRow[] | null; total: number }) {
+	const [query, setQuery] = useState('');
+	const filtered = useMemo(() => {
+		const q = query.trim().toLowerCase();
+		return (intents ?? []).filter((i) => !q || (i.productTitle ?? i.productId).toLowerCase().includes(q));
+	}, [intents, query]);
+
+	function exportCsv() {
+		downloadCsv('order-intents.csv', [
+			['Time', 'Product', 'Price (BDT)', 'Rate', 'Commission (BDT)'],
+			...filtered.map((i) => [i.createdAt, i.productTitle ?? i.productId, i.priceMinor / 100, formatPercent(i.commissionBps), i.commissionMinor / 100]),
+		]);
+	}
+
+	return (
+		<Card
+			title="Ledger"
+			description={total > (intents?.length ?? 0) ? `Latest ${intents?.length} of ${total}` : `${total} in total`}
+			id="orders"
+			flush
+			actions={
+				<button type="button" className={secondaryButton} onClick={exportCsv} disabled={filtered.length === 0}>
+					<Download className="size-4" aria-hidden="true" /> Export CSV
+				</button>
 			}
-
-			const body = JSON.stringify({
-				title: data.get('title'),
-				description: data.get('description'),
-				category: data.get('category'),
-				priceMinor: Math.round(Number(data.get('price')) * 100),
-				imageUrl,
-			});
-			const { product: result } = product
-				? await apiFetch<{ product: Product }>(`/api/vendor/products/${encodeURIComponent(product.id)}`, {
-						method: 'PATCH',
-						body,
-					})
-				: await apiFetch<{ product: Product }>('/api/vendor/products', { method: 'POST', body });
-			onSaved(result);
-		} catch (e) {
-			setError((e as Error).message);
-			setSaving(false);
-		}
-	}
-
-	return (
-		<div className="fixed inset-0 z-50 flex justify-end">
-			<Backdrop onClose={onClose} />
-			<div
-				role="dialog"
-				aria-modal="true"
-				aria-labelledby="product-drawer-title"
-				className="relative flex h-full w-full max-w-lg flex-col bg-surface shadow-2xl"
-			>
-				<div className="flex items-center justify-between border-b border-line px-6 py-4">
-					<div>
-						<h2 id="product-drawer-title" className="m-0 text-lg font-semibold">
-							{heading}
-						</h2>
-						<p className="m-0 text-sm text-ink-soft">
-							{product ? 'Changes go live as soon as you save.' : 'It goes live as soon as you save.'}
-						</p>
-					</div>
-					<button type="button" onClick={onClose} className={iconButton}>
-						<X className="size-5" aria-hidden="true" />
-						<span className="sr-only">Close panel</span>
-					</button>
-				</div>
-
-				<form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
-					<div className="grid flex-1 content-start gap-5 overflow-y-auto px-6 py-5">
-						<label className="text-sm font-medium">
-							Product name
-							<input
-								ref={firstField}
-								name="title"
-								required
-								minLength={2}
-								maxLength={200}
-								defaultValue={product?.title}
-								className={field}
-							/>
-						</label>
-						<div className="grid gap-5 min-[480px]:grid-cols-2">
-							<label className="text-sm font-medium">
-								Category
-								<select name="category" required className={field} defaultValue={product?.category ?? CATEGORIES[0]!.slug}>
-									{CATEGORIES.map((category) => (
-										<option key={category.slug} value={category.slug}>
-											{category.name}
-										</option>
-									))}
-								</select>
-							</label>
-							<label className="text-sm font-medium">
-								Price (BDT)
-								<input
-									name="price"
-									type="number"
-									required
-									min="1"
-									step="0.01"
-									inputMode="decimal"
-									placeholder="0.00"
-									defaultValue={product ? product.priceMinor / 100 : undefined}
-									className={field}
-								/>
-							</label>
-						</div>
-						<label className="text-sm font-medium">
-							Description <span className="font-normal text-ink-soft">(optional)</span>
-							<textarea
-								name="description"
-								rows={4}
-								maxLength={2000}
-								placeholder="Size, material, what's in the box…"
-								defaultValue={product?.description}
-								className={field}
-							/>
-						</label>
-						<div className="text-sm font-medium">
-							<label htmlFor="product-image">
-								Product image <span className="font-normal text-ink-soft">(optional)</span>
-							</label>
-							<div className="mt-1.5 flex items-center gap-4 rounded-lg border border-dashed border-line p-4">
-								{shownImage ? (
-									<img src={shownImage} alt="Product image preview" className="size-16 rounded-md object-cover" />
-								) : (
-									<span className="grid size-16 place-items-center rounded-md bg-canvas text-ink-soft" aria-hidden="true">
-										<ImagePlus className="size-6" strokeWidth={1.5} />
-									</span>
-								)}
-								<div className="font-normal">
-									<label htmlFor="product-image" className="cursor-pointer font-semibold text-brand hover:underline">
-										{shownImage ? 'Change image' : 'Upload an image'}
-									</label>
-									{shownImage && (
-										<button
-											type="button"
-											onClick={removeImage}
-											className="ml-3 text-sm font-semibold text-ink-soft hover:text-red-700"
-										>
-											Remove
-										</button>
-									)}
-									<span className="block text-xs text-ink-soft">PNG, JPEG, or WebP up to 2 MB</span>
-								</div>
-							</div>
-							<input
-								ref={fileInput}
-								id="product-image"
-								name="image"
-								type="file"
-								accept={IMAGE_TYPES.join(',')}
-								className="sr-only"
-								onChange={(e) => {
-									const picked = e.currentTarget.files?.[0];
-									setPreview(picked ? URL.createObjectURL(picked) : null);
-								}}
-							/>
-						</div>
-						{error && <ErrorNote message={error} />}
-					</div>
-
-					<div className="flex justify-end gap-3 border-t border-line bg-canvas/40 px-6 py-4">
-						<button type="button" onClick={onClose} className={secondaryButton}>
-							Cancel
-						</button>
-						<button type="submit" disabled={saving} className={primaryButton}>
-							{saving ? 'Saving…' : product ? 'Save changes' : 'Save product'}
-						</button>
-					</div>
-				</form>
-			</div>
-		</div>
+		>
+			<Toolbar>
+				<SearchInput value={query} onChange={setQuery} label="Filter by product" />
+			</Toolbar>
+			<IntentTable intents={intents ? filtered : null} />
+			{intents && filtered.length > 0 && <TableFoot shown={filtered.length} total={intents.length} noun="order intents" />}
+		</Card>
 	);
 }
 
-function DeleteDialog({
-	product,
-	onClose,
-	onDeleted,
-}: {
-	product: Product;
-	onClose: () => void;
-	onDeleted: (product: Product) => void;
-}) {
-	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const cancel = useRef<HTMLButtonElement>(null);
-	useModal(onClose);
-	useEffect(() => cancel.current?.focus(), []);
+/* ---------- Shop ---------- */
 
-	async function confirm() {
-		setBusy(true);
-		setError(null);
-		try {
-			await apiFetch(`/api/vendor/products/${encodeURIComponent(product.id)}`, { method: 'DELETE' });
-			onDeleted(product);
-		} catch (e) {
-			setError((e as Error).message);
-			setBusy(false);
-		}
-	}
-
+function ShopSection({ vendor, user, insights }: { vendor: Vendor | null; user: SessionUser; insights: VendorInsights | null }) {
 	return (
-		<div className="fixed inset-0 z-50 grid place-items-center p-4">
-			<Backdrop onClose={onClose} />
-			<div
-				role="alertdialog"
-				aria-modal="true"
-				aria-labelledby="delete-title"
-				aria-describedby="delete-text"
-				className="relative w-full max-w-md rounded-xl bg-surface p-6 shadow-2xl"
-			>
-				<div className="flex gap-4">
-					<span className="grid size-10 shrink-0 place-items-center rounded-full bg-red-50 text-red-700" aria-hidden="true">
-						<Trash2 className="size-5" />
-					</span>
-					<div className="min-w-0">
-						<h2 id="delete-title" className="m-0 text-base font-semibold">
-							Delete this product?
-						</h2>
-						<p id="delete-text" className="m-0 mt-1 text-sm text-ink-soft">
-							<Strong>{product.title}</Strong> will be removed from your shop. Past order intents and commission stay
-							on record.
-						</p>
-					</div>
-				</div>
-				{error && (
-					<div className="mt-4">
-						<ErrorNote message={error} />
-					</div>
-				)}
-				<div className="mt-6 flex justify-end gap-3">
-					<button ref={cancel} type="button" onClick={onClose} className={secondaryButton}>
-						Cancel
-					</button>
-					<button
-						type="button"
-						onClick={confirm}
-						disabled={busy}
-						className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-red-700 disabled:opacity-60"
+		<div className="grid gap-6 min-[1024px]:grid-cols-2">
+			<Card title="Shop details" id="shop-details">
+				<dl className="m-0 grid gap-4 text-sm">
+					<Detail label="Shop name">{vendor?.name ?? '—'}</Detail>
+					<Detail label="WhatsApp number">{vendor ? `+${vendor.phone}` : '—'}</Detail>
+					<Detail label="Login email">{user.email}</Detail>
+					<Detail label="Seller since">{vendor ? formatDate(vendor.createdAt) : '—'}</Detail>
+				</dl>
+				{vendor && (
+					<a
+						href={`/search?q=${encodeURIComponent(vendor.name)}`}
+						className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-brand no-underline hover:underline"
 					>
-						{busy ? 'Deleting…' : 'Delete product'}
-					</button>
-				</div>
-			</div>
+						See your shop on the storefront <ArrowRight className="size-4" aria-hidden="true" />
+					</a>
+				)}
+			</Card>
+			<Card title="Billing" id="billing">
+				<dl className="m-0 grid gap-4 text-sm">
+					<Detail label="Commission rate">{vendor ? `${formatPercent(vendor.commissionBps)} of the price, per order intent` : '—'}</Detail>
+					<Detail label="Order intents to date">{insights ? insights.totals.orderIntents : '—'}</Detail>
+					<Detail label="Commission owed">{insights ? formatBdt(insights.totals.commissionOwedMinor) : '—'}</Detail>
+				</dl>
+				<p className="m-0 mt-5 rounded-lg bg-canvas p-4 text-xs leading-relaxed text-ink-soft">
+					Each Order Now click records the product's price and your rate at that moment. Changing a price later does not
+					change past commission. Monthly statements are coming soon.
+				</p>
+			</Card>
 		</div>
 	);
-}
-
-function Strong({ children }: { children: ReactNode }) {
-	return <span className="font-semibold text-ink">{children}</span>;
 }

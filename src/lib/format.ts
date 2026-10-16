@@ -16,3 +16,45 @@ export function groupByCategory<T extends { category: string }>(items: T[]): [st
 	}
 	return [...groups.entries()];
 }
+
+const dateTime = new Intl.DateTimeFormat('en-BD', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Dhaka' });
+const date = new Intl.DateTimeFormat('en-BD', { dateStyle: 'medium', timeZone: 'Asia/Dhaka' });
+const day = new Intl.DateTimeFormat('en-BD', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+
+export function formatDateTime(iso: string): string {
+	return dateTime.format(new Date(iso));
+}
+
+export function formatDate(iso: string): string {
+	return date.format(new Date(iso));
+}
+
+/** `2026-10-17` (a calendar day, no time) → `17 Oct`. */
+export function formatDay(ymd: string): string {
+	return day.format(new Date(`${ymd}T00:00:00Z`));
+}
+
+export function formatPercent(bps: number): string {
+	return `${bps / 100}%`;
+}
+
+/** Spreadsheet-safe CSV: quotes every cell and defuses leading =, +, -, @. */
+export function toCsv(rows: (string | number)[][]): string {
+	return rows
+		.map((cells) =>
+			cells
+				.map((cell) => {
+					const text = typeof cell === 'number' ? String(cell) : /^[=+\-@]/.test(cell) ? `'${cell}` : cell;
+					return `"${text.replaceAll('"', '""')}"`;
+				})
+				.join(','),
+		)
+		.join('\r\n');
+}
+
+export function downloadCsv(filename: string, rows: (string | number)[][]): void {
+	const url = URL.createObjectURL(new Blob([`﻿${toCsv(rows)}`], { type: 'text/csv;charset=utf-8' }));
+	const link = Object.assign(document.createElement('a'), { href: url, download: filename });
+	link.click();
+	URL.revokeObjectURL(url);
+}

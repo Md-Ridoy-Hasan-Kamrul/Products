@@ -132,7 +132,7 @@ test('vendor logs in, adds a product with an image, and logs out', async ({ page
 	await page.goto('/');
 	await expect(page.locator('#cat-kids-toys').getByRole('link', { name: title, exact: true })).toBeVisible();
 
-	await page.goto('/vendor/dashboard');
+	await page.goto('/vendor/dashboard#products');
 	await page.getByRole('button', { name: `Edit ${title}` }).click();
 	const editor = page.getByRole('dialog', { name: 'Edit product' });
 	await expect(editor.getByLabel('Product name')).toHaveValue(title);
@@ -198,7 +198,35 @@ test('admin login rejects a vendor and shows commission for the admin', async ({
 	await logIn(page, '/admin/login', E2E_ADMIN);
 	await expect(page).toHaveURL(/\/admin\/dashboard$/);
 	await expect(page.getByRole('heading', { level: 1, name: 'Marketplace overview' })).toBeVisible();
-	await expect(page.getByRole('columnheader', { name: 'Commission owed' })).toBeVisible();
-	await expect(page.getByRole('row').filter({ hasText: 'Gadget Haat' })).toContainText('10%');
-	await expect(page.getByRole('row').filter({ hasText: 'Deshi Style' })).toBeVisible();
+	const commission = page.getByRole('region', { name: 'Commission by vendor' });
+	await expect(commission.getByRole('columnheader', { name: 'Commission owed' })).toBeVisible();
+	await expect(commission.getByRole('row').filter({ hasText: 'Gadget Haat' })).toContainText('10%');
+	await expect(commission.getByRole('row').filter({ hasText: 'Deshi Style' })).toBeVisible();
+
+	const sections = page.getByRole('navigation', { name: 'Admin navigation' });
+	await sections.getByRole('link', { name: /Vendors/ }).click();
+	await expect(page.getByRole('heading', { level: 1, name: 'Vendors' })).toBeVisible();
+	await page.getByLabel('Search by name or phone').fill('deshi');
+	await expect(page.getByRole('row').filter({ hasText: 'Gadget Haat' })).toHaveCount(0);
+	await page.getByRole('button', { name: 'Deshi Style' }).click();
+	await expect(page).toHaveURL(/#orders$/);
+	await expect(page.getByRole('combobox', { name: 'Vendor', exact: true })).toHaveValue('vendor-deshi-style');
+
+	await sections.getByRole('link', { name: /Products/ }).click();
+	await expect(page.getByRole('row').filter({ hasText: 'Premium Cotton Panjabi' })).toContainText('Deshi Style');
+});
+
+test('vendor sees their own order intents in the Seller Center', async ({ page }) => {
+	await page.goto('/products/smart-watch-s8');
+	await page.getByRole('link', { name: 'Order Now' }).first().click();
+
+	await page.goto('/vendor/login');
+	await page.getByRole('button', { name: 'One-click login as Gadget Haat' }).click();
+	await expect(page.getByRole('heading', { level: 1, name: 'Gadget Haat' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Activity' })).toBeVisible();
+
+	await page.getByRole('navigation', { name: 'Seller Center navigation' }).getByRole('link', { name: /Order intents/ }).click();
+	await expect(page.getByRole('heading', { level: 1, name: 'Order intents' })).toBeVisible();
+	await expect(page.getByRole('row').filter({ hasText: 'Smart Watch S8' }).first()).toBeVisible();
+	await expect(page.getByRole('row').filter({ hasText: 'Cotton Panjabi' })).toHaveCount(0);
 });
