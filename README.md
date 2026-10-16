@@ -76,7 +76,7 @@
 │   │   ├── auth/         LoginForm.tsx, VendorAccess.tsx
 │   │   └── dashboards/   VendorDashboard.tsx (Overview, Products, Order intents, Shop & billing), AdminDashboard.tsx (Overview, Vendors, Products, Order intents), ActivityChart.tsx, IntentTable.tsx, ProductEditor.tsx, ui.tsx (লগইন চেক, sidebar shell, sort/search/filter, কার্ড)
 │   ├── lib/              api.ts, auth.ts, whatsapp.ts, categories.ts, format.ts, types.ts
-│   └── styles/global.css কমলা brand, Order Now সবুজ
+│   └── styles/tailwind.css শুধু Tailwind: import, @theme রঙ/ফন্ট (কমলা brand, Order Now সবুজ), container-page। বাকি সব স্টাইল Tailwind class-এ
 ├── scripts/dev.mjs   Web + API একসাথে চালায়
 ├── e2e/              Playwright (নিজস্ব API :4100 + web :4421 চালায়)
 └── api/              API: Node + Express + Zod
